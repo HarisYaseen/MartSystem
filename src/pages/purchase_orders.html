@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Purchase Orders</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 32px; border-radius: 16px; width: 850px; box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        .po-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; display: none; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item active"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Purchase Orders</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Manage incoming inventory and supplier orders.</p>
+            </div>
+            <button class="btn btn-primary" onclick="showModal()"><i data-lucide="plus"></i> Create PO</button>
+        </div>
+
+        <div class="content">
+            <div class="card">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>PO Number</th>
+                                <th>Supplier</th>
+                                <th>Date</th>
+                                <th>Total Cost</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create PO Modal -->
+    <div id="po-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Purchase Order</h2>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="hideModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div id="reader"></div>
+
+            <div class="po-form-grid">
+                <div class="form-group">
+                    <label>Supplier (Optional)</label>
+                    <select id="po-supplier">
+                        <option value="">None</option>
+                        <!-- Loaded via JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Scan Product to Add</label>
+                    <div style="display: flex; gap: 8px;">
+                        <div style="position: relative; flex: 1;">
+                            <i data-lucide="search" style="position: absolute; left: 10px; top: 10px; width: 16px; height: 16px; color: var(--text-muted);"></i>
+                            <input type="text" id="po-scan" placeholder="Scan barcode..." style="padding-left: 35px;">
+                        </div>
+                        <button id="po-cam-btn" class="btn btn-outline" onclick="toggleScanner()"><i data-lucide="camera"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0; min-height: 200px;">
+                <table style="font-size: 0.85rem;">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Barcode</th>
+                            <th>Qty</th>
+                            <th>Unit Cost</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="po-items-list">
+                        <tr><td colspan="5" class="text-center" style="padding: 40px; color: var(--text-muted);">Scan products to add to this purchase order</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <div style="font-size: 1.25rem; font-weight: 700;">Total: Rs <span id="po-total">0.00</span></div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="hideModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitPO()">Submit Order</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let poItems = [];
+        let html5QrCode;
+
+        async function loadPOs() {
+            const orders = await window.electron.invoke('get-purchase-orders');
+            const list = document.getElementById('po-list');
+            list.innerHTML = '';
+            
+            orders.forEach(o => {
+                const tr = document.createElement('tr');
+                const isPending = o.status === 'pending';
+                tr.innerHTML = `
+                    <td style="display: flex; align-items: center; gap: 10px;">
+                        <i data-lucide="file-text" style="color: var(--text-muted); width: 18px;"></i>
+                        <span style="font-weight: 600;">${o.po_number}</span>
+                    </td>
+                    <td>${o.supplier_name || 'No Supplier'}</td>
+                    <td style="color: var(--text-muted);">${o.created_at}</td>
+                    <td style="font-weight: 600;">Rs ${o.total_cost.toLocaleString()}</td>
+                    <td><span class="badge ${isPending ? 'badge-blue' : 'badge-green'}"><i data-lucide="${isPending ? 'clock' : 'check'}" style="width:12px; margin-right:4px;"></i> ${o.status}</span></td>
+                    <td><button class="btn btn-outline" style="padding: 5px 12px; font-size: 0.8rem;" onclick="${isPending ? `receivePO(${o.id})` : ''}">${isPending ? 'Receive' : 'View'}</button></td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function toggleScanner() {
+            const reader = document.getElementById('reader');
+            const camBtn = document.getElementById('po-cam-btn');
+            
+            if (html5QrCode) {
+                await stopScanner();
+            } else {
+                reader.style.display = 'block';
+                camBtn.classList.remove('btn-outline');
+                camBtn.classList.add('btn-primary');
+                startScanner();
+            }
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    handleProductScan(decodedText);
+                    // keep scanning in PO if needed, or stop
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                alert("Camera error: " + err);
+                stopScanner();
+            });
+        }
+
+        async function stopScanner() {
+            if (html5QrCode) {
+                await html5QrCode.stop();
+                html5QrCode = null;
+            }
+            document.getElementById('reader').style.display = 'none';
+            const camBtn = document.getElementById('po-cam-btn');
+            camBtn.classList.remove('btn-primary');
+            camBtn.classList.add('btn-outline');
+        }
+
+        async function showModal() {
+            poItems = [];
+            renderPOItems();
+            
+            const suppliers = await window.electron.invoke('get-suppliers');
+            const select = document.getElementById('po-supplier');
+            select.innerHTML = '<option value="">None</option>';
+            suppliers.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = s.name;
+                select.appendChild(opt);
+            });
+
+            document.getElementById('po-modal').style.display = 'flex';
+            document.getElementById('po-scan').focus();
+        }
+
+        function hideModal() {
+            stopScanner();
+            document.getElementById('po-modal').style.display = 'none';
+        }
+
+        document.getElementById('po-scan').onkeydown = async (e) => {
+            if (e.key === 'Enter') {
+                const barcode = e.target.value;
+                e.target.value = '';
+                handleProductScan(barcode);
+            }
+        };
+
+        async function handleProductScan(barcode) {
+            const cleanBarcode = barcode.trim();
+            if (!cleanBarcode) return;
+            const p = await window.electron.invoke('get-product-by-barcode', cleanBarcode);
+            if (p && p.id) {
+                const existing = poItems.find(item => item.id === p.id);
+                if (existing) {
+                    existing.quantity++;
+                } else {
+                    poItems.push({ ...p, quantity: 1, cost_price: p.cost_price });
+                }
+                renderPOItems();
+            } else {
+                alert('Product not found!');
+            }
+        }
+
+        function renderPOItems() {
+            const list = document.getElementById('po-items-list');
+            if (poItems.length === 0) {
+                list.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 40px; color: var(--text-muted);">Scan products to add to this purchase order</td></tr>';
+                document.getElementById('po-total').innerText = '0.00';
+                return;
+            }
+
+            list.innerHTML = '';
+            let total = 0;
+            poItems.forEach((item, index) => {
+                const sub = item.cost_price * item.quantity;
+                total += sub;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.barcode}</td>
+                    <td><input type="number" value="${item.quantity}" style="width: 60px;" onchange="updatePOQty(${index}, this.value)"></td>
+                    <td><input type="number" value="${item.cost_price}" style="width: 100px;" onchange="updatePOCost(${index}, this.value)"></td>
+                    <td>Rs ${sub.toLocaleString()}</td>
+                `;
+                list.appendChild(tr);
+            });
+            document.getElementById('po-total').innerText = total.toLocaleString();
+        }
+
+        function updatePOQty(index, val) { poItems[index].quantity = parseInt(val) || 1; renderPOItems(); }
+        function updatePOCost(index, val) { poItems[index].cost_price = parseFloat(val) || 0; renderPOItems(); }
+
+        async function submitPO() {
+            if (poItems.length === 0) return alert('PO is empty!');
+            const supplierId = document.getElementById('po-supplier').value;
+            const res = await window.electron.invoke('create-po', { supplierId, items: poItems });
+            if (res.success) {
+                hideModal();
+                loadPOs();
+            }
+        }
+
+        async function receivePO(id) {
+            if (confirm("Confirm receiving this order? Stock will be updated.")) {
+                const res = await window.electron.invoke('receive-po', id);
+                if (res.success) loadPOs();
+            }
+        }
+
+        loadPOs();
+    </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Suppliers</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 32px; border-radius: 16px; width: 550px; box-shadow: var(--shadow-lg); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item active"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Suppliers</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Manage your product suppliers and vendors.</p>
+            </div>
+            <button class="btn btn-primary" onclick="showModal()"><i data-lucide="user-plus"></i> Add Supplier</button>
+        </div>
+
+        <div class="content">
+            <div class="card" style="padding: 12px 24px;">
+                <div style="position: relative; margin: 15px 0 25px 0;">
+                    <i data-lucide="search" style="position: absolute; left: 12px; top: 11px; width: 18px; height: 18px; color: var(--text-muted);"></i>
+                    <input type="text" id="search" placeholder="Search suppliers..." style="width: 100%; padding: 10px 10px 10px 40px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem;">
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Company Name</th>
+                                <th>Contact Person</th>
+                                <th>Contact Info</th>
+                                <th>Added On</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplier-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Modal -->
+    <div id="supplier-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Supplier</h2>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="hideModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="supplier-form">
+                <input type="hidden" id="s-id">
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" id="s-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Contact Person</label>
+                    <input type="text" id="s-contact">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="s-phone">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="s-email">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Address</label>
+                    <input type="text" id="s-address">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="hideModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Supplier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        async function loadSuppliers() {
+            const suppliers = await window.electron.invoke('get-suppliers');
+            const list = document.getElementById('supplier-list');
+            list.innerHTML = '';
+            
+            suppliers.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div style="font-weight: 600;">${s.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="map-pin" style="width:10px; height:10px;"></i> ${s.address || 'No Address'}</div>
+                    </td>
+                    <td>${s.contact_name || '-'}</td>
+                    <td>
+                        <div style="font-size: 0.85rem;"><i data-lucide="mail" style="width:12px; height:12px;"></i> ${s.email || '-'}</div>
+                        <div style="font-size: 0.85rem;"><i data-lucide="phone" style="width:12px; height:12px;"></i> ${s.phone || '-'}</div>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">${s.created_at || '-'}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" style="padding: 6px;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>
+                            <button class="btn btn-danger" style="padding: 6px;"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                        </div>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function showModal() {
+            document.getElementById('supplier-form').reset();
+            document.getElementById('s-id').value = '';
+            document.getElementById('supplier-modal').style.display = 'flex';
+        }
+
+        function hideModal() {
+            document.getElementById('supplier-modal').style.display = 'none';
+        }
+
+        document.getElementById('supplier-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const s = {
+                id: document.getElementById('s-id').value,
+                name: document.getElementById('s-name').value,
+                contact_name: document.getElementById('s-contact').value,
+                phone: document.getElementById('s-phone').value,
+                email: document.getElementById('s-email').value,
+                address: document.getElementById('s-address').value
+            };
+            const res = await window.electron.invoke('save-supplier', s);
+            if (res.success) {
+                hideModal();
+                loadSuppliers();
+            }
+        };
+
+        loadSuppliers();
+    </script>
+</body>
+</html>

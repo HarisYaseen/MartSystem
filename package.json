@@ -1,0 +1,34 @@
+{
+  "name": "mart-management-system",
+  "version": "1.0.0",
+  "description": "Mart Management System - Lightweight Edition",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "desktop:dev": "electron .",
+    "desktop:start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
+    "electron": "^34.5.8",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.mart.management",
+    "productName": "Mart Management",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/sql.js/**/*"
+    ]
+  }
+}

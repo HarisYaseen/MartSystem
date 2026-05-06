@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Sales History</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item active"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Sales History</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Review past sales transactions and receipts.</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="card">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Receipt #</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Modal -->
+    <div id="items-modal" class="modal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <div>
+                    <h2 style="margin: 0;">Sale Details</h2>
+                    <p id="items-subtitle" style="color: var(--text-muted); font-size: 0.875rem; margin-top: 4px;"></p>
+                </div>
+                <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="hideItemsModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-list"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 24px;">
+                <button class="btn btn-primary" onclick="hideItemsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        lucide.createIcons();
+
+        async function loadSales() {
+            const sales = await window.electron.invoke('get-sales-history');
+            const list = document.getElementById('sales-list');
+            list.innerHTML = '';
+            
+            sales.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${s.created_at}</td>
+                    <td style="font-weight: 600;">${s.receipt_number}</td>
+                    <td style="font-weight: 700;">Rs ${s.net_amount.toLocaleString()}</td>
+                    <td><span class="badge badge-gray">${s.payment_method}</span></td>
+                    <td>
+                        <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;" onclick="viewItems(${s.id}, '${s.receipt_number}')">View Items</button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function viewItems(saleId, receiptNo) {
+            document.getElementById('items-subtitle').innerText = 'Receipt: ' + receiptNo;
+            const items = await window.electron.invoke('get-sale-items', saleId);
+            const list = document.getElementById('items-list');
+            list.innerHTML = '';
+            
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">
+                        ${item.product_name}
+                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">${item.barcode}</div>
+                    </td>
+                    <td>${item.quantity}</td>
+                    <td>Rs ${item.unit_price.toLocaleString()}</td>
+                    <td style="font-weight: 600;">Rs ${item.subtotal.toLocaleString()}</td>
+                `;
+                list.appendChild(tr);
+            });
+            
+            document.getElementById('items-modal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function hideItemsModal() {
+            document.getElementById('items-modal').style.display = 'none';
+        }
+
+        loadSales();
+    </script>
+</body>
+</html>

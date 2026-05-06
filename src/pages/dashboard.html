@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Dashboard</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item active"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Dashboard</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Overview of your store's performance today.</p>
+            </div>
+            <div id="date-display" style="font-weight: 500; color: var(--text-muted);"></div>
+        </div>
+
+        <div class="content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="icon-wrapper"><i data-lucide="dollar-sign"></i></div>
+                    <div class="label">Today's Revenue</div>
+                    <div class="value" id="stat-revenue">Rs. 0</div>
+                    <div class="sub-value" id="stat-sales-count">0 sales today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon-wrapper" style="background: #ecfdf5; color: #059669;"><i data-lucide="trending-up"></i></div>
+                    <div class="label">Today's Profit</div>
+                    <div class="value" id="stat-profit">Rs. 0</div>
+                    <div class="sub-value">Gross margin today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon-wrapper" style="background: #fef2f2; color: #dc2626;"><i data-lucide="alert-triangle"></i></div>
+                    <div class="label">Low Stock Alerts</div>
+                    <div class="value" id="stat-low-stock" style="color: var(--danger);">0</div>
+                    <div class="sub-value">Products below reorder level</div>
+                </div>
+                <div class="stat-card">
+                    <div class="icon-wrapper" style="background: #fdf2f7; color: #db2777;"><i data-lucide="box"></i></div>
+                    <div class="label">Pending Orders</div>
+                    <div class="value">0</div>
+                    <div class="sub-value">Purchase orders awaiting delivery</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+                <div class="card">
+                    <h3>Sales Analytics (30 Days)</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Top Products</h3>
+                    <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 15px;">Highest revenue items this month.</p>
+                    <div id="top-products-list" style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- Loaded via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Low Stock Alerts</h3>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 15px;">Items that need to be reordered soon.</p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Barcode</th>
+                                <th>Current Stock</th>
+                                <th>Reorder Level</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="low-stock-table">
+                            <!-- Loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        async function loadDashboard() {
+            const stats = await window.electron.invoke('get-dashboard-stats');
+            document.getElementById('stat-revenue').innerText = 'Rs. ' + stats.todayRevenue.toLocaleString();
+            document.getElementById('stat-sales-count').innerText = stats.todaySales + ' sales today';
+            document.getElementById('stat-low-stock').innerText = stats.lowStock;
+            
+            // Basic profit calculation (assuming 20% margin for demo if not in DB yet)
+            document.getElementById('stat-profit').innerText = 'Rs. ' + (stats.todayRevenue * 0.2).toLocaleString();
+
+            // Load Low Stock Table
+            const lowStockItems = await window.electron.invoke('get-inventory-report');
+            const tableBody = document.getElementById('low-stock-table');
+            tableBody.innerHTML = '';
+            lowStockItems.slice(0, 5).forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.barcode}</td>
+                    <td style="color: var(--danger); font-weight: 600;">${item.quantity}</td>
+                    <td>${item.reorder_level}</td>
+                    <td><span class="badge badge-red">Low Stock</span></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            // Load Top Products
+            const topProducts = await window.electron.invoke('get-top-products');
+            const topList = document.getElementById('top-products-list');
+            topList.innerHTML = '';
+            topProducts.slice(0, 5).forEach(p => {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.alignItems = 'center';
+                div.innerHTML = `
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.9rem;">${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Mart Product</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 700; font-size: 0.9rem;">Rs. ${p.revenue.toLocaleString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${p.total_sold} sold</div>
+                    </div>
+                `;
+                topList.appendChild(div);
+            });
+
+            // Analytics Chart
+            const analytics = await window.electron.invoke('get-sales-analytics');
+            renderChart(analytics);
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Daily Revenue',
+                        data: data.map(d => d.revenue),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        async function updateBusinessName() {
+            const settings = await window.electron.invoke('get-settings');
+            if (settings.mart_name) {
+                const title = document.querySelector('.sidebar h2');
+                if (title) title.innerHTML = `<i data-lucide="layout-grid"></i> ${settings.mart_name}`;
+                lucide.createIcons();
+            }
+        }
+
+        document.getElementById('date-display').innerText = new Date().toDateString();
+        loadDashboard();
+        updateBusinessName();
+    </script>
+</body>
+</html>

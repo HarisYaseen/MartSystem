@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Settings</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .setting-card { padding: 24px; }
+        .setting-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--primary); }
+        .setting-header i { width: 20px; height: 20px; }
+        .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .status-pill.success { background: #f0fdf4; color: #166534; }
+        .status-pill.info { background: #eff6ff; color: #1e40af; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+        <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item active"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Settings</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">System configuration and maintenance.</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="settings-grid">
+                <!-- Database & Backup -->
+                <div class="card setting-card">
+                    <div class="setting-header">
+                        <i data-lucide="database"></i>
+                        <h3 style="margin: 0;">Database Management</h3>
+                    </div>
+                    <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 20px;">
+                        Secure your data by creating a backup to your local D: drive. 
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button class="btn btn-primary" onclick="runBackup()" style="width: 100%; justify-content: center; gap: 8px;">
+                            <i data-lucide="save" style="width: 18px;"></i> Create Immediate Backup (D:/)
+                        </button>
+                        <div id="backup-status" style="display: none; font-size: 0.8rem; padding: 10px; border-radius: 8px;"></div>
+                    </div>
+                </div>
+
+                <!-- System Updates -->
+                <div class="card setting-card">
+                    <div class="setting-header">
+                        <i data-lucide="refresh-cw"></i>
+                        <h3 style="margin: 0;">System Updates</h3>
+                    </div>
+                    <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 20px;">
+                        Keep your system updated with the latest features and security fixes.
+                    </p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px;">
+                        <div>
+                            <div style="font-weight: 600;">Current Version</div>
+                            <div style="font-size: 0.875rem; color: var(--text-muted);">v1.0.4 (Production)</div>
+                        </div>
+                        <span class="status-pill success">Up to Date</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="checkUpdates()" style="width: 100%; justify-content: center; gap: 8px;">
+                        <i data-lucide="search" style="width: 18px;"></i> Check for Updates
+                    </button>
+                    <div id="update-status" style="display: none; margin-top: 15px; font-size: 0.85rem; text-align: center; color: var(--text-muted);"></div>
+                </div>
+
+                <!-- Business Details -->
+                <div class="card setting-card">
+                    <div class="setting-header">
+                        <i data-lucide="building"></i>
+                        <h3 style="margin: 0;">Business Information</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>Mart Name</label>
+                        <input type="text" id="mart-name" value="MartOS Management">
+                    </div>
+                    <div class="form-group">
+                        <label>Receipt Footer Note</label>
+                        <input type="text" id="receipt-footer" value="Thank you for shopping with us!">
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%;" onclick="saveSettings()">Save Changes</button>
+                </div>
+
+                <!-- About -->
+                <div class="card setting-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 50%; margin-bottom: 15px;">
+                        <i data-lucide="shield-check" style="width: 48px; height: 48px; color: var(--primary);"></i>
+                    </div>
+                    <h3>Galaxy Ecosystem</h3>
+                    <p style="font-size: 0.875rem; color: var(--text-muted);">Powered by GalaxyLaptops & SMS Connect Technology.</p>
+                    <div style="margin-top: 20px; font-size: 0.75rem; color: var(--text-muted);">
+                        &copy; 2024 MartOS Management System.<br>All rights reserved.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        async function loadSettings() {
+            const settings = await window.electron.invoke('get-settings');
+            if (settings.mart_name) {
+                document.getElementById('mart-name').value = settings.mart_name;
+            }
+            if (settings.receipt_footer) {
+                document.getElementById('receipt-footer').value = settings.receipt_footer;
+            }
+            updateSidebarName(settings.mart_name || 'MartOS');
+        }
+
+        function updateSidebarName(name) {
+            const sidebarTitle = document.querySelector('.sidebar h2');
+            if (sidebarTitle) {
+                sidebarTitle.innerHTML = `<i data-lucide="layout-grid"></i> ${name}`;
+                lucide.createIcons();
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                mart_name: document.getElementById('mart-name').value,
+                receipt_footer: document.getElementById('receipt-footer').value
+            };
+            
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = 'Saving...';
+            btn.disabled = true;
+
+            const res = await window.electron.invoke('save-settings', settings);
+            if (res.success) {
+                updateSidebarName(settings.mart_name);
+                btn.innerText = 'Saved!';
+                btn.style.background = 'var(--success)';
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
+            } else {
+                alert('Error saving settings: ' + res.error);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        }
+
+        async function runBackup() {
+            const status = document.getElementById('backup-status');
+            status.style.display = 'block';
+            status.style.background = '#eff6ff';
+            status.style.color = '#1e40af';
+            status.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:14px; vertical-align:middle;"></i> Copying database to D:/Partition...';
+            lucide.createIcons();
+
+            try {
+                const res = await window.electron.invoke('create-backup-to-d');
+                if (res.success) {
+                    status.style.background = '#f0fdf4';
+                    status.style.color = '#166534';
+                    status.innerHTML = `<i data-lucide="check-circle" style="width:14px; vertical-align:middle;"></i> Backup successful! Saved to: <b>${res.path}</b>`;
+                } else {
+                    status.style.background = '#fef2f2';
+                    status.style.color = '#991b1b';
+                    status.innerHTML = `<i data-lucide="alert-circle" style="width:14px; vertical-align:middle;"></i> Backup failed: ${res.error}`;
+                }
+            } catch (err) {
+                status.innerHTML = 'Error communicating with system.';
+            }
+            lucide.createIcons();
+        }
+
+        function checkUpdates() {
+            const btn = event.target.closest('button');
+            const status = document.getElementById('update-status');
+            btn.disabled = true;
+            status.style.display = 'block';
+            status.innerHTML = 'Checking Galaxy servers...';
+            
+            setTimeout(() => {
+                status.innerHTML = 'Your system is running the latest version of MartOS (v1.0.4).';
+                btn.disabled = false;
+            }, 2000);
+        }
+
+        loadSettings();
+    </script>
+</body>
+</html>

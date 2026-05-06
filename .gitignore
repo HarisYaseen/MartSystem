@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.sqlite
+*.sqlite-journal
+.DS_Store
+.env
+package-lock.json

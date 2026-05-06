@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Products</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 20px; }
+        .modal-content { background: white; padding: 32px; border-radius: 16px; width: 680px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); position: relative; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; position: sticky; top: -32px; background: white; z-index: 10; padding: 10px 0; }
+        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; position: sticky; bottom: -32px; background: white; z-index: 10; padding: 10px 0; border-top: 1px solid var(--border); }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; display: none; margin-bottom: 15px; background: #000; }
+        input, select { width: 100% !important; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item active"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Products</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Manage your product catalog.</p>
+            </div>
+            <button class="btn btn-primary" onclick="showModal()"><i data-lucide="plus"></i> Add Product</button>
+        </div>
+
+        <div class="content">
+            <div class="card" style="padding: 12px 24px;">
+                <div style="position: relative; margin: 15px 0 25px 0;">
+                    <i data-lucide="search" style="position: absolute; left: 12px; top: 11px; width: 18px; height: 18px; color: var(--text-muted);"></i>
+                    <input type="text" id="search" placeholder="Search by name, barcode, brand..." style="width: 100%; padding: 10px 10px 10px 40px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem;">
+                </div>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Barcode</th>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Cost</th>
+                                <th>Sale Price</th>
+                                <th>Stock</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="product-list">
+                            <!-- Loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 id="modal-title" style="margin: 0;">Add New Product</h2>
+                    <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 4px;">Fill in the product details below.</p>
+                </div>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="hideModal()"><i data-lucide="x"></i></button>
+            </div>
+
+            <div id="scan-success-msg" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 10px; border-radius: 8px; margin-bottom: 20px; align-items: center; gap: 10px;">
+                <i data-lucide="scan" style="width: 18px;"></i>
+                <span id="scanned-barcode-val"></span>
+                <i data-lucide="x" style="margin-left: auto; cursor: pointer;" onclick="this.parentElement.style.display='none'"></i>
+            </div>
+
+            <form id="product-form">
+                <input type="hidden" id="p-id">
+                <div id="reader"></div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Barcode</label>
+                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="p-barcode" placeholder="Scan or type barcode" required style="flex: 1;">
+                                <button type="button" id="modal-cam-btn" class="btn btn-outline" onclick="toggleScanner()" style="padding: 10px;"><i data-lucide="camera"></i></button>
+                            </div>
+                            <div id="lookup-status" style="font-size: 0.75rem; display: none;">
+                                <span style="color: var(--primary);"><i data-lucide="loader-2" class="spin" style="width: 12px; height: 12px; vertical-align: middle;"></i> Searching global database...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Product Name</label>
+                        <input type="text" id="p-name" placeholder="Enter product name" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Brand</label>
+                        <input type="text" id="p-brand" placeholder="Enter brand name">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="p-category">
+                            <option value="General">General</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Snacks">Snacks</option>
+                            <option value="Grocery">Grocery</option>
+                            <option value="Personal Care">Personal Care</option>
+                            <option value="Household">Household</option>
+                            <option value="Dairy">Dairy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Cost Price (PKR)</label>
+                        <input type="number" id="p-cost" required step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Sale Price (PKR)</label>
+                        <input type="number" id="p-price" required step="0.01" value="0">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Initial Quantity</label>
+                        <input type="number" id="p-qty" required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Reorder Level</label>
+                        <input type="number" id="p-reorder" value="5">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Unit</label>
+                        <input type="text" id="p-unit" value="pcs">
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier</label>
+                        <select id="p-supplier">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="margin-top: 32px;">
+                    <button type="button" class="btn btn-outline" style="min-width: 100px;" onclick="hideModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="min-width: 120px;">Add Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let html5QrCode;
+
+        async function loadProducts() {
+            const products = await window.electron.invoke('get-products');
+            window.allProducts = products; // Store for global search
+            renderProductList(products);
+        }
+
+        function renderProductList(products) {
+            const list = document.getElementById('product-list');
+            list.innerHTML = '';
+            
+            products.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.id = `prod-${p.barcode}`;
+                const isLow = p.quantity <= p.reorder_level;
+                
+                tr.innerHTML = `
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">${p.barcode}</td>
+                    <td>
+                        <div style="font-weight: 600;">${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${p.brand || 'No Brand'}</div>
+                    </td>
+                    <td><span class="badge badge-gray">${p.category}</span></td>
+                    <td>Rs ${p.cost_price.toLocaleString()}</td>
+                    <td style="font-weight: 600;">Rs ${p.sale_price.toLocaleString()}</td>
+                    <td style="font-weight: 700; color: ${isLow ? 'var(--danger)' : 'var(--success)'};">
+                        ${p.quantity} ${p.unit}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" style="padding: 6px;" onclick='editProduct(${JSON.stringify(p)})'><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>
+                            <button class="btn btn-danger" style="padding: 6px;"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                        </div>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function toggleScanner() {
+            const reader = document.getElementById('reader');
+            const camBtn = document.getElementById('modal-cam-btn');
+            
+            if (html5QrCode) {
+                await stopScanner();
+            } else {
+                reader.style.display = 'block';
+                camBtn.classList.remove('btn-outline');
+                camBtn.classList.add('btn-primary');
+                startScanner();
+            }
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { 
+                fps: 30, 
+                qrbox: { width: 300, height: 200 },
+                aspectRatio: 1.0,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                },
+                formatsToSupport: [ 
+                    Html5QrcodeSupportedFormats.EAN_13, 
+                    Html5QrcodeSupportedFormats.EAN_8, 
+                    Html5QrcodeSupportedFormats.UPC_A, 
+                    Html5QrcodeSupportedFormats.UPC_E, 
+                    Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.CODE_93,
+                    Html5QrcodeSupportedFormats.CODABAR,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.DATA_MATRIX,
+                    Html5QrcodeSupportedFormats.AZTEC,
+                    Html5QrcodeSupportedFormats.PDF_417
+                ]
+            };
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                config,
+                (decodedText) => {
+                    document.getElementById('p-barcode').value = decodedText;
+                    document.getElementById('scanned-barcode-val').innerText = decodedText;
+                    document.getElementById('scan-success-msg').style.display = 'flex';
+                    stopScanner();
+                    performLookup(decodedText); // Trigger lookup immediately after scan
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                alert("Camera error: " + err);
+                stopScanner();
+            });
+        }
+
+        async function stopScanner() {
+            if (html5QrCode) {
+                await html5QrCode.stop();
+                html5QrCode = null;
+            }
+            document.getElementById('reader').style.display = 'none';
+            const camBtn = document.getElementById('modal-cam-btn');
+            camBtn.classList.remove('btn-primary');
+            camBtn.classList.add('btn-outline');
+        }
+
+        async function showModal(prefilledBarcode = '') {
+            document.getElementById('product-form').reset();
+            document.getElementById('p-id').value = '';
+            document.getElementById('modal-title').innerText = 'Add New Product';
+            document.getElementById('scan-success-msg').style.display = 'none';
+            
+            if (prefilledBarcode) {
+                document.getElementById('p-barcode').value = prefilledBarcode;
+                performLookup(prefilledBarcode);
+            }
+
+            const suppliers = await window.electron.invoke('get-suppliers');
+            const select = document.getElementById('p-supplier');
+            select.innerHTML = '<option value="">None</option>';
+            suppliers.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = s.name;
+                select.appendChild(opt);
+            });
+
+            document.getElementById('product-modal').style.display = 'flex';
+            if (!prefilledBarcode) {
+                setTimeout(() => document.getElementById('p-barcode').focus(), 100);
+            } else {
+                setTimeout(() => document.getElementById('p-name').focus(), 100);
+            }
+        }
+
+        function hideModal() {
+            stopScanner();
+            document.getElementById('product-modal').style.display = 'none';
+        }
+
+        function editProduct(p) {
+            document.getElementById('p-id').value = p.id;
+            document.getElementById('p-barcode').value = p.barcode;
+            document.getElementById('p-name').value = p.name;
+            document.getElementById('p-brand').value = p.brand;
+            document.getElementById('p-category').value = p.category;
+            document.getElementById('p-cost').value = p.cost_price;
+            document.getElementById('p-price').value = p.sale_price;
+            document.getElementById('p-qty').value = p.quantity;
+            document.getElementById('p-unit').value = p.unit;
+            document.getElementById('modal-title').innerText = 'Edit Product';
+            document.getElementById('product-modal').style.display = 'flex';
+            document.getElementById('lookup-status').style.display = 'none';
+        }
+
+        async function performLookup(barcode) {
+            if (barcode.length < 4) return;
+            
+            const status = document.getElementById('lookup-status');
+            status.style.display = 'block';
+            status.innerHTML = '<span style="color: var(--primary);"><i data-lucide="loader-2" class="spin" style="width: 12px; height: 12px; vertical-align: middle;"></i> Searching global database...</span>';
+            lucide.createIcons();
+
+            try {
+                const res = await window.electron.invoke('lookup-barcode-external', barcode);
+                if (res.success && res.product) {
+                    document.getElementById('p-name').value = res.product.name;
+                    document.getElementById('p-brand').value = res.product.brand;
+                    
+                    // Match category if possible
+                    const catSelect = document.getElementById('p-category');
+                    const options = Array.from(catSelect.options).map(o => o.value);
+                    if (options.includes(res.product.category)) {
+                        catSelect.value = res.product.category;
+                    }
+
+                    status.innerHTML = '<span style="color: var(--success);"><i data-lucide="check-circle" style="width: 12px; height: 12px; vertical-align: middle;"></i> Details fetched!</span>';
+                    
+                    // Stop camera if it's running because we found the product
+                    stopScanner();
+                } else {
+                    status.innerHTML = '<span style="color: var(--text-muted);"><i data-lucide="info" style="width: 12px; height: 12px; vertical-align: middle;"></i> No details found. Please enter manually.</span>';
+                }
+            } catch (err) {
+                status.style.display = 'none';
+            }
+            lucide.createIcons();
+        }
+
+        let lookupTimeout;
+        document.getElementById('p-barcode').oninput = (e) => {
+            clearTimeout(lookupTimeout);
+            const val = e.target.value.trim();
+            if (val.length >= 4) {
+                lookupTimeout = setTimeout(() => performLookup(val), 500);
+            } else {
+                document.getElementById('lookup-status').style.display = 'none';
+            }
+        };
+
+        // Advanced Search & Scan Listener
+        let barcodeBuffer = '';
+        let lastKeyTime = Date.now();
+
+        document.getElementById('search').oninput = (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = window.allProducts.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                p.barcode.toLowerCase().includes(query) ||
+                (p.brand && p.brand.toLowerCase().includes(query))
+            );
+            renderProductList(filtered);
+
+            // If exactly one match and it's a barcode scan (long query)
+            if (filtered.length === 1 && query.length >= 8) {
+                const row = document.getElementById(`prod-${filtered[0].barcode}`);
+                if (row) {
+                    row.style.background = '#f0f9ff';
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        };
+
+        // Global key listener for hardware scanners
+        window.addEventListener('keydown', (e) => {
+            // If modal is open OR user is already typing in an input field, don't trigger global scanner logic
+            if (document.getElementById('product-modal').style.display === 'flex') return;
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            
+            const currentTime = Date.now();
+            
+            // Scanners usually send keys very fast (< 30ms)
+            if (currentTime - lastKeyTime > 100) {
+                barcodeBuffer = '';
+            }
+            
+            if (e.key === 'Enter') {
+                if (barcodeBuffer.length >= 6) {
+                    handleScannedBarcode(barcodeBuffer);
+                    barcodeBuffer = '';
+                    e.preventDefault();
+                }
+            } else if (e.key.length === 1) {
+                barcodeBuffer += e.key;
+            }
+            
+            lastKeyTime = currentTime;
+        });
+
+        async function handleScannedBarcode(barcode) {
+            const existing = window.allProducts.find(p => p.barcode === barcode);
+            if (existing) {
+                // Highlight existing
+                document.getElementById('search').value = barcode;
+                renderProductList([existing]);
+                const row = document.getElementById(`prod-${barcode}`);
+                if (row) {
+                    row.style.background = '#f0f9ff';
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                // Not found? Open Add Modal!
+                showModal(barcode);
+            }
+        }
+
+        document.getElementById('product-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const p = {
+                id: document.getElementById('p-id').value,
+                barcode: document.getElementById('p-barcode').value,
+                name: document.getElementById('p-name').value,
+                brand: document.getElementById('p-brand').value,
+                category: document.getElementById('p-category').value,
+                cost_price: parseFloat(document.getElementById('p-cost').value) || 0,
+                sale_price: parseFloat(document.getElementById('p-price').value) || 0,
+                quantity: parseInt(document.getElementById('p-qty').value) || 0,
+                unit: document.getElementById('p-unit').value || 'pcs',
+                reorder_level: parseInt(document.getElementById('p-reorder').value) || 5,
+                supplier_id: document.getElementById('p-supplier').value || null
+            };
+            const res = await window.electron.invoke('save-product', p);
+            if (res && res.success) {
+                hideModal();
+                loadProducts();
+            } else {
+                alert('Error saving product: ' + (res ? res.error : 'Unknown error'));
+            }
+        };
+
+        async function updateBusinessName() {
+            const settings = await window.electron.invoke('get-settings');
+            if (settings.mart_name) {
+                const title = document.querySelector('.sidebar h2');
+                if (title) title.innerHTML = `<i data-lucide="layout-grid"></i> ${settings.mart_name}`;
+                lucide.createIcons();
+            }
+        }
+
+        loadProducts();
+        updateBusinessName();
+    </script>
+</body>
+</html>

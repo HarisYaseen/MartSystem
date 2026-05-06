@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Reports</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .report-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-top: 24px; }
+        .chart-container { height: 350px; position: relative; margin-top: 20px; }
+        .table-container { margin-top: 24px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item active"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Sales & Performance Reports</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Analyze your business trends and performance.</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <div class="tab active" onclick="setTab('trends')">Sales Trends</div>
+                <div class="tab" onclick="setTab('category')">Category Sales</div>
+                <div class="tab" onclick="setTab('products')">Top Products</div>
+                <div class="tab" onclick="setTab('financials')">Financials</div>
+            </div>
+
+            <div id="report-content">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let currentTab = 'trends';
+        let mainChart = null;
+
+        async function setTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            renderReport();
+        }
+
+        async function renderReport() {
+            const container = document.getElementById('report-content');
+            container.innerHTML = '';
+
+            if (currentTab === 'trends') {
+                const sales = await window.electron.invoke('get-sales');
+                container.innerHTML = `
+                    <div class="card">
+                        <h3>Daily Sales Trend</h3>
+                        <div class="chart-container"><canvas id="trendsChart"></canvas></div>
+                    </div>
+                `;
+                renderTrendsChart(sales);
+            } 
+            else if (currentTab === 'category') {
+                const data = await window.electron.invoke('get-category-sales');
+                container.innerHTML = `
+                    <div class="report-grid">
+                        <div class="card">
+                            <h3>Category Sales Breakdown</h3>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Items Sold</th>
+                                            <th>Total Revenue</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.map(row => `
+                                            <tr>
+                                                <td><span class="badge badge-blue">${row.category}</span></td>
+                                                <td>${row.total_sold}</td>
+                                                <td style="font-weight:600;">Rs ${row.revenue.toLocaleString()}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Revenue Split</h3>
+                            <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+                        </div>
+                    </div>
+                `;
+                renderCategoryChart(data);
+            }
+            else if (currentTab === 'products') {
+                const data = await window.electron.invoke('get-top-products');
+                container.innerHTML = `
+                    <div class="card">
+                        <h3>Best Selling Products</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Product Name</th>
+                                        <th>Total Sold</th>
+                                        <th>Revenue Generated</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(row => `
+                                        <tr>
+                                            <td style="font-weight:600;">${row.name}</td>
+                                            <td>${row.total_sold}</td>
+                                            <td style="color:var(--success); font-weight:600;">Rs ${row.revenue.toLocaleString()}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+            else if (currentTab === 'financials') {
+                const sales = await window.electron.invoke('get-sales');
+                const totalRev = sales.reduce((sum, s) => sum + s.net_amount, 0);
+                const totalSales = sales.length;
+                container.innerHTML = `
+                    <div class="stats-grid" style="margin-bottom: 24px;">
+                        <div class="stat-card">
+                            <span class="label">Total Lifetime Revenue</span>
+                            <span class="value">Rs ${totalRev.toLocaleString()}</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Total Transactions</span>
+                            <span class="value">${totalSales}</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Average Order Value</span>
+                            <span class="value">Rs ${totalSales ? (totalRev / totalSales).toFixed(2) : 0}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function renderTrendsChart(sales) {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            const daily = {};
+            sales.forEach(s => {
+                const date = s.created_at.split('T')[0];
+                daily[date] = (daily[date] || 0) + s.net_amount;
+            });
+
+            const labels = Object.keys(daily).sort();
+            const data = labels.map(l => daily[l]);
+
+            if (mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Daily Revenue',
+                        data,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.category),
+                    datasets: [{
+                        data: data.map(d => d.revenue),
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        renderReport();
+    </script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mart Management - Inventory</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 32px; border-radius: 16px; width: 500px; box-shadow: var(--shadow-lg); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+        textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2><i data-lucide="layout-grid"></i> MartOS</h2>
+                <div class="nav-group">
+            <a href="dashboard.html" class="nav-item"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+            <a href="pos.html" class="nav-item"><i data-lucide="shopping-cart"></i> POS Terminal</a>
+            <a href="products.html" class="nav-item"><i data-lucide="package"></i> Products</a>
+            <a href="inventory.html" class="nav-item active"><i data-lucide="boxes"></i> Inventory</a>
+            <a href="suppliers.html" class="nav-item"><i data-lucide="users"></i> Suppliers</a>
+            <a href="purchase_orders.html" class="nav-item"><i data-lucide="file-text"></i> Purchase Orders</a>
+            <a href="sales.html" class="nav-item"><i data-lucide="history"></i> Sales History</a>
+            <a href="reports.html" class="nav-item"><i data-lucide="bar-chart-3"></i> Reports</a>
+            <a href="settings.html" class="nav-item"><i data-lucide="settings"></i> Settings</a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <div>
+                <h1>Inventory</h1>
+                <p style="color: var(--text-muted); font-size: 0.875rem;">Monitor stock levels and make manual adjustments.</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <div class="tab active" onclick="setTab('all')">All Stock</div>
+                <div class="tab" onclick="setTab('low')">
+                    <i data-lucide="alert-triangle" style="width:16px;"></i> Low Stock
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0;">
+                <div style="padding: 24px; border-bottom: 1px solid var(--border);">
+                    <div style="position: relative; width: 400px; display: flex; align-items: center;">
+                        <i data-lucide="search" style="position: absolute; left: 14px; width: 18px; color: var(--text-muted); pointer-events: none;"></i>
+                        <input type="text" id="search" placeholder="Search products..." style="width: 100%; padding: 12px 12px 12px 42px; border: 1px solid var(--border); border-radius: 10px; outline: none; font-size: 0.95rem;">
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Barcode</th>
+                                <th>Product</th>
+                                <th>Current Stock</th>
+                                <th>Reorder Level</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adjust Stock Modal -->
+    <div id="adjust-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 style="margin: 0;">Adjust Stock</h2>
+                    <p id="adjust-subtitle" style="color: var(--text-muted); font-size: 0.875rem; margin-top: 4px;">Adjusting stock for ...</p>
+                </div>
+                <button class="btn btn-outline" style="padding: 5px; border:none;" onclick="hideModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity Change (use negative to reduce)</label>
+                <input type="number" id="adj-delta" value="0" required>
+            </div>
+
+            <div class="form-group">
+                <label>Reason</label>
+                <select id="adj-reason">
+                    <option value="Inventory Correction">Inventory Correction</option>
+                    <option value="Stock In">Stock In</option>
+                    <option value="Damaged">Damaged</option>
+                    <option value="Return">Return</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Note (Optional)</label>
+                <textarea id="adj-note" placeholder="Details about this adjustment" style="height: 80px;"></textarea>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 32px;">
+                <button class="btn btn-outline" style="min-width: 100px;" onclick="hideModal()">Cancel</button>
+                <button class="btn btn-primary" style="min-width: 150px;" onclick="submitAdjustment()">Submit Adjustment</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let selectedProductId = null;
+        let currentTab = 'all';
+        window.allProducts = [];
+
+        async function loadInventory() {
+            const products = await window.electron.invoke('get-products');
+            window.allProducts = products;
+            renderInventory();
+        }
+
+        function renderInventory() {
+            const list = document.getElementById('inventory-list');
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+            list.innerHTML = '';
+
+            let filtered = currentTab === 'low' ? window.allProducts.filter(p => p.quantity <= (p.reorder_level || 10)) : window.allProducts;
+            filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.barcode && p.barcode.toLowerCase().includes(searchTerm)));
+
+            filtered.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.id = `prod-${p.barcode}`;
+                const isLow = p.quantity <= (p.reorder_level || 10);
+                tr.innerHTML = `
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">${p.barcode || '-'}</td>
+                    <td>
+                        <div style="font-weight: 600;">${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${p.category}</div>
+                    </td>
+                    <td style="font-weight: 700; color: ${isLow ? 'var(--danger)' : 'var(--success)'};">
+                        ${p.quantity} ${p.unit || 'pcs'}
+                    </td>
+                    <td style="color: var(--text-muted);">${p.reorder_level || 10}</td>
+                    <td>
+                        <button class="btn btn-outline" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.8rem;" onclick='showAdjustModal(${JSON.stringify(p)})'>
+                            <i data-lucide="arrow-up-down" style="width: 14px;"></i> Adjust
+                        </button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function showAdjustModal(product, autoStockIn = false) {
+            selectedProductId = product.id;
+            document.getElementById('adjust-subtitle').innerHTML = `Adjusting stock for <b>${product.name}</b> (Current: ${product.quantity})`;
+            document.getElementById('adj-delta').value = '';
+            document.getElementById('adj-note').value = '';
+            
+            if (autoStockIn) {
+                document.getElementById('adj-reason').value = 'Stock In';
+            }
+
+            document.getElementById('adjust-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('adj-delta').focus(), 100);
+        }
+
+        function hideModal() {
+            document.getElementById('adjust-modal').style.display = 'none';
+        }
+
+        async function submitAdjustment() {
+            const delta = parseInt(document.getElementById('adj-delta').value);
+            const reason = document.getElementById('adj-reason').value;
+            if (isNaN(delta) || delta === 0) return alert('Please enter a valid change value.');
+
+            const res = await window.electron.invoke('adjust-stock', { 
+                productId: selectedProductId, 
+                delta, 
+                reason 
+            });
+            
+            if (res.success) {
+                hideModal();
+                loadInventory();
+            }
+        }
+
+        function setTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            const clickedTab = Array.from(document.querySelectorAll('.tab')).find(t => t.innerText.toLowerCase().includes(tab));
+            if (clickedTab) clickedTab.classList.add('active');
+            renderInventory();
+        }
+
+        document.getElementById('search').oninput = renderInventory;
+
+        // Global Scanner Listener for Inventory
+        let barcodeBuffer = '';
+        let lastKeyTime = Date.now();
+
+        window.addEventListener('keydown', (e) => {
+            // If modal is open, let it handle its own input
+            if (document.getElementById('adjust-modal').style.display === 'flex') {
+                if (e.key === 'Enter') {
+                    submitAdjustment();
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            // If user is already typing in an input field (like the search box), don't capture for barcode
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            
+            const currentTime = Date.now();
+            if (currentTime - lastKeyTime > 100) barcodeBuffer = '';
+            
+            if (e.key === 'Enter') {
+                if (barcodeBuffer.length >= 4) {
+                    handleScannedBarcode(barcodeBuffer);
+                    barcodeBuffer = '';
+                    e.preventDefault();
+                }
+            } else if (e.key.length === 1) {
+                barcodeBuffer += e.key;
+            }
+            
+            lastKeyTime = currentTime;
+        });
+
+        function handleScannedBarcode(barcode) {
+            const product = window.allProducts.find(p => p.barcode === barcode);
+            if (product) {
+                showAdjustModal(product, true);
+            } else {
+                // Flash search box to indicate not found
+                const search = document.getElementById('search');
+                search.value = barcode;
+                renderInventory();
+                search.style.borderColor = 'var(--danger)';
+                setTimeout(() => search.style.borderColor = 'var(--border)', 500);
+            }
+        }
+
+        async function updateBusinessName() {
+            const settings = await window.electron.invoke('get-settings');
+            if (settings.mart_name) {
+                const title = document.querySelector('.sidebar h2');
+                if (title) title.innerHTML = `<i data-lucide="layout-grid"></i> ${settings.mart_name}`;
+                lucide.createIcons();
+            }
+        }
+
+        loadInventory();
+        updateBusinessName();
+    </script>
+</body>
+</html>

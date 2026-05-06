@@ -1,0 +1,54 @@
+Building a Mart Management System (POS & Inventory) focused on manufacturer-original barcode scanning is a solid project. Using existing UPC/EAN codes (the ones already on the products) simplifies your database management because you don't have to print labels for every item.
+
+Here is a detailed, phase-wise roadmap to build this software.
+
+---
+
+## Phase 1: Core Inventory & Database Architecture
+The foundation must support **Global Trade Item Numbers (GTIN)**. Instead of generating IDs, your primary key or unique identifier for products will be the scanned barcode string.
+
+*   **Product Catalog:** Fields for Product Name, Brand, Category, Barcode (String), and Unit of Measure.
+*   **Supplier Management:** Link products to specific vendors.
+*   **Initial Stock Entry:** A module where you scan a product and enter the "Cost Price," "Sale Price," and "Current Quantity."
+*   **The Scanner Interface:** Ensure your input fields are optimized for "HID" (Human Interface Device) scanners. These act like a keyboard, so the software must auto-focus on the input field and handle the `Enter` key signal sent by the scanner.
+
+## Phase 2: The Point of Sale (POS) Terminal
+This is the high-speed interface for the cashier. It needs to be keyboard-centric for efficiency.
+
+*   **Scanning Workflow:** When a barcode is scanned, the system should instantly find the item and add it to the cart. If scanned again, it increments the quantity.
+*   **Dynamic Pricing:** Handle discounts, taxes (GST/VAT), and sub-totals in real-time.
+*   **Payment Processing:** Support multiple methods (Cash, Card, Digital Wallets).
+*   **Receipt Generation:** Print thermal receipts with the mart’s header and a summary of items.
+
+## Phase 3: Stock & Warehouse Management
+Since you aren't generating barcodes, managing incoming shipments is critical.
+
+*   **Purchase Orders (PO):** Scan incoming items from suppliers to update stock levels automatically.
+*   **Low Stock Alerts:** Set "Reorder Levels." If a product's stock falls below 10, the system highlights it in red.
+*   **Stock Adjustment:** A manual override for damaged goods or expired items.
+
+## Phase 4: Reporting & Analytics
+Turn your data into insights.
+
+*   **Sales Reports:** Daily, weekly, and monthly revenue tracking.
+*   **Profit/Loss Analysis:** Calculate the margin based on the difference between "Cost Price" and "Sale Price."
+*   **Fast-Moving Goods:** Identify which barcodes are scanned most frequently to optimize shelf space.
+
+## Phase 5: Advanced Features & Multi-Terminal Support
+Once the core is stable, focus on scaling and security.
+
+*   **User Roles:** Different permissions for Admin (can change prices) and Cashiers (can only scan and sell).
+*   **Cloud Sync:** If the mart has multiple branches, sync the inventory database to a central server.
+*   **Customer Loyalty:** Link a phone number to a purchase to offer points or discounts.
+
+---
+
+### Technical Implementation Tips
+
+| Feature | Recommendation |
+| :--- | :--- |
+| **Barcode Format** | Support **EAN-13** and **UPC-A** (standard for retail products). |
+| **Input Handling** | Use a "Global Listener" or ensure the barcode input field is always focused to prevent missed scans. |
+| **Database** | Use an indexed column for the `barcode_id` to ensure searches take milliseconds, even with 10,000+ items. |
+
+Since you mentioned you'll be doing this in phases, which part of the **Phase 1 (Database & Inventory)** are you planning to start with first?
