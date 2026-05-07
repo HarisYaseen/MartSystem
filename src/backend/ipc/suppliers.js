@@ -86,7 +86,7 @@ function registerSupplierHandlers(handle) {
         return res;
     });
 
-    handle('receive-purchase-order', (e, poId) => {
+    handle('receive-po', (e, poId) => {
         const db = getDB();
         try {
             db.run('BEGIN TRANSACTION');
@@ -95,6 +95,37 @@ function registerSupplierHandlers(handle) {
                 db.run('UPDATE products SET quantity = quantity + ?, updated_at = datetime("now", "localtime") WHERE id = ?', [item.quantity, item.product_id]);
             }
             db.run('UPDATE purchase_orders SET status = "received", received_at = datetime("now", "localtime") WHERE id = ?', [poId]);
+            db.run('COMMIT');
+            saveDB();
+            return { success: true };
+        } catch (err) {
+            db.run('ROLLBACK');
+            return { success: false, error: err.message };
+        }
+    });
+
+    handle('return-po-item', (e, { poId, itemId, productId, quantity, unitCost }) => {
+        const db = getDB();
+        try {
+            db.run('BEGIN TRANSACTION');
+            // Subtract from stock
+            db.run('UPDATE products SET quantity = quantity - ?, updated_at = datetime("now", "localtime") WHERE id = ?', [quantity, productId]);
+            
+            // Log as a return in supplier ledger if PO had a supplier
+            const po = queryOne('SELECT supplier_id, po_number FROM purchase_orders WHERE id = ?', [poId]);
+            if (po && po.supplier_id) {
+                const totalReturn = quantity * unitCost;
+                const supplier = queryOne('SELECT current_balance FROM suppliers WHERE id = ?', [po.supplier_id]);
+                const newBalance = (supplier ? supplier.current_balance : 0) - totalReturn;
+                
+                db.run('INSERT INTO supplier_ledger (supplier_id, transaction_type, ref_id, ref_number, description, credit, balance) VALUES (?,?,?,?,?,?,?)',
+                    [po.supplier_id, 'return', poId, po.po_number, `Item Return: ${quantity} units`, totalReturn, newBalance]);
+                db.run('UPDATE suppliers SET current_balance = ? WHERE id = ?', [newBalance, po.supplier_id]);
+            }
+            
+            // Mark item as returned in the PO items list (optional: we just remove or flag it)
+            // For now, we'll just track stock/balance logic
+            
             db.run('COMMIT');
             saveDB();
             return { success: true };
