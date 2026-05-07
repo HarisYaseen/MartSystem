@@ -140,22 +140,18 @@
         }
 
         async function refundSale(saleId, receiptNo) {
-            if (!confirm(`Are you sure you want to refund FULL Receipt ${receiptNo}? This will return ALL items to stock.`)) return;
-            
             const res = await handleIPC('refund-sale', saleId);
             if (res.success) {
-                showToast('Full sale refunded and stock updated.');
+                showToast('Full sale refunded and stock updated.', 'success');
                 hideItemsModal();
                 loadSales();
             }
         }
 
         async function returnItem(saleId, itemId, productId, quantity, unitPrice, name) {
-            if (!confirm(`Return ${quantity}x ${name} to stock?`)) return;
-
             const res = await handleIPC('return-sale-item', { saleId, itemId, productId, quantity, unitPrice });
             if (res.success) {
-                showToast('Item returned successfully.');
+                showToast(`Returned ${quantity}x ${name} to stock.`, 'success');
                 const receiptNo = document.getElementById('items-subtitle').innerText.split(': ')[1];
                 viewItems(saleId, receiptNo);
                 loadSales();

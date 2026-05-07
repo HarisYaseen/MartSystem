@@ -8,7 +8,8 @@
     "dev": "electron .",
     "lint": "eslint src/**",
     "format": "prettier --write src/**",
-    "test": "jest"
+    "test": "jest",
+    "dist": "electron-builder"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",

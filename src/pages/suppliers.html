@@ -4,6 +4,7 @@
     <title>Mart Management - Suppliers</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="../assets/js/common.js"></script>
     <style>
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); }
         .modal-content { background: white; padding: 32px; border-radius: 16px; width: 550px; box-shadow: var(--shadow-lg); }
@@ -234,11 +235,10 @@
 
         async function recalculateBalance() {
             if (!selectedSupplier) return;
-            if (!confirm('This will audit all ledger entries and correct the balance. Continue?')) return;
             
             const res = await window.electron.invoke('recalculate-supplier-balance', selectedSupplier.id);
             if (res.success) {
-                alert('Balance corrected! New Balance: Rs ' + res.newBalance.toLocaleString());
+                showToast('Balance corrected! New Balance: Rs ' + res.newBalance.toLocaleString(), 'success');
                 const suppliers = await window.electron.invoke('get-suppliers');
                 const updated = suppliers.find(s => s.id === selectedSupplier.id);
                 viewLedger(updated);
@@ -292,13 +292,14 @@
             });
 
             if (res.success) {
+                showToast('Adjustment recorded successfully!', 'success');
                 document.getElementById('adjustment-modal').style.display = 'none';
                 loadSuppliers();
                 const suppliers = await window.electron.invoke('get-suppliers');
                 const updated = suppliers.find(s => s.id === selectedSupplier.id);
                 viewLedger(updated);
             } else {
-                alert('Adjustment failed: ' + res.error);
+                showToast('Adjustment failed: ' + res.error, 'error');
             }
         };
 
@@ -322,12 +323,15 @@
             });
 
             if (res.success) {
+                showToast('Payment recorded successfully!', 'success');
                 document.getElementById('payment-modal').style.display = 'none';
                 loadSuppliers(); // Refresh main list for balance
                 // Refresh ledger view if open
                 const suppliers = await window.electron.invoke('get-suppliers');
-                const updated = suppliers.find(s => s.id === selectedSupplierId);
+                const updated = suppliers.find(s => s.id === selectedSupplier.id);
                 if (updated) viewLedger(updated);
+            } else {
+                showToast('Payment failed: ' + res.error, 'error');
             }
         };
 
@@ -363,8 +367,11 @@
             };
             const res = await window.electron.invoke('save-supplier', s);
             if (res.success) {
+                showToast('Supplier saved successfully!', 'success');
                 hideModal();
                 loadSuppliers();
+            } else {
+                showToast('Error saving supplier: ' + res.error, 'error');
             }
         };
 
