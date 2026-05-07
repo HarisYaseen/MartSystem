@@ -1,8 +1,7 @@
-const { ipcMain } = require('electron');
 const { queryOne, queryAll, run, logInfo } = require('../db');
 
-function registerProductHandlers() {
-    ipcMain.handle('get-dashboard-stats', () => {
+function registerProductHandlers(handle) {
+    handle('get-dashboard-stats', () => {
         const totalProducts = queryOne('SELECT COUNT(*) as c FROM products')?.c || 0;
         const lowStock = queryOne('SELECT COUNT(*) as c FROM products WHERE quantity <= reorder_level')?.c || 0;
         const todaySales = queryOne("SELECT COUNT(*) as c FROM sales WHERE date(created_at) = date('now', 'localtime')")?.c || 0;
@@ -24,7 +23,7 @@ function registerProductHandlers() {
         return queryAll('SELECT * FROM products WHERE barcode = ? OR name LIKE ?', [query, `%${query}%`]);
     });
 
-    ipcMain.handle('save-product', (e, p) => {
+    handle('save-product', (e, p) => {
         // Strict Input Validation
         if (!p.barcode || p.barcode.trim() === '') return { success: false, error: 'Barcode is required.' };
         if (!p.name || p.name.trim() === '') return { success: false, error: 'Product name is required.' };
@@ -40,31 +39,25 @@ function registerProductHandlers() {
         }
     });
 
-    ipcMain.handle('delete-product', async (e, id) => {
-        // 1. Check if product has sales history
+    handle('delete-product', async (e, id) => {
         const sales = queryOne('SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?', [id]);
         if (sales && sales.count > 0) {
             return { success: false, error: 'Cannot delete product with sales history. Try setting stock to 0 instead.' };
         }
-
-        // 2. Check if product has PO history
         const pos = queryOne('SELECT COUNT(*) as count FROM purchase_order_items WHERE product_id = ?', [id]);
         if (pos && pos.count > 0) {
             return { success: false, error: 'Cannot delete product linked to purchase orders.' };
         }
-
         return run('DELETE FROM products WHERE id = ?', [id]);
     });
 
-    ipcMain.handle('adjust-stock', (e, { productId, delta, reason }) => {
+    handle('adjust-stock', (e, { productId, delta, reason }) => {
         return run('UPDATE products SET quantity = quantity + ?, updated_at = datetime("now", "localtime") WHERE id = ?', [delta, productId]);
     });
 
-    ipcMain.handle('lookup-barcode-external', async (e, barcode) => {
+    handle('lookup-barcode-external', async (e, barcode) => {
         try {
             logInfo(`Looking up barcode: ${barcode}`);
-            
-            // Source 1: Open Food Facts
             try {
                 const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
                 const data = await response.json();
@@ -73,7 +66,6 @@ function registerProductHandlers() {
                     const name = p.product_name || p.generic_name || '';
                     let category = p.categories ? p.categories.split(',')[0] : 'General';
                     if (category.includes(':')) category = category.split(':').pop();
-                    
                     return {
                         success: true,
                         product: {
@@ -85,7 +77,6 @@ function registerProductHandlers() {
                 }
             } catch (err) { /* ignore */ }
 
-            // Source 2: UPCItemDB
             try {
                 const response = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
                 const data = await response.json();
@@ -102,7 +93,6 @@ function registerProductHandlers() {
                     };
                 }
             } catch (err) { /* ignore */ }
-
             return { success: false, error: 'Product not found.' };
         } catch (e) {
             return { success: false, error: 'Lookup failed.' };

@@ -9,7 +9,7 @@ function registerReportHandlers(handle) {
                         ORDER BY p.quantity ASC`);
     });
 
-    ipcMain.handle('get-sales-analytics', () => {
+    handle('get-sales-analytics', () => {
         return queryAll(`SELECT date(created_at) as date, SUM(net_amount) as revenue, COUNT(*) as transactions 
                         FROM sales 
                         WHERE created_at >= date('now', '-30 days')
@@ -17,7 +17,7 @@ function registerReportHandlers(handle) {
                         ORDER BY date ASC`);
     });
 
-    ipcMain.handle('get-top-products', () => {
+    handle('get-top-products', () => {
         return queryAll(`SELECT product_name as name, SUM(quantity) as total_sold, SUM(subtotal) as revenue 
                         FROM sale_items 
                         GROUP BY product_id 
@@ -25,7 +25,7 @@ function registerReportHandlers(handle) {
                         LIMIT 10`);
     });
 
-    ipcMain.handle('get-category-sales', () => {
+    handle('get-category-sales', () => {
         return queryAll(`SELECT p.category, SUM(si.quantity) as total_sold, SUM(si.subtotal) as revenue 
                         FROM sale_items si
                         JOIN products p ON si.product_id = p.id
@@ -33,7 +33,7 @@ function registerReportHandlers(handle) {
                         ORDER BY revenue DESC`);
     });
 
-    ipcMain.handle('get-report-data', (e, { range, from, to }) => {
+    handle('get-report-data', (e, { range, from, to }) => {
         try {
             let dateFilter = '';
             if (range === 'daily') dateFilter = "date(created_at) = date('now', 'localtime')";

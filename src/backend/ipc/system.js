@@ -64,13 +64,14 @@ function registerSystemHandlers(handle) {
     });
 }
 
-    ipcMain.handle('get-thermal-printer', async () => {
-        const win = BrowserWindow.getFocusedWindow();
+function registerPrinterHandlers(handle) {
+    handle('get-thermal-printer', async (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender);
         if (!win) return null;
         const printers = await win.webContents.getPrintersAsync();
-        const thermal = printers.find(p => 
-            p.name.toLowerCase().includes('thermal') || 
-            p.name.toLowerCase().includes('pos') || 
+        const thermal = printers.find(p =>
+            p.name.toLowerCase().includes('thermal') ||
+            p.name.toLowerCase().includes('pos') ||
             p.name.toLowerCase().includes('80mm')
         );
         if (thermal) return thermal.name;
@@ -78,7 +79,7 @@ function registerSystemHandlers(handle) {
         return def ? def.name : null;
     });
 
-    ipcMain.handle('print-receipt-silent', async (e, { printerName, htmlContent }) => {
+    handle('print-receipt-silent', async (event, { printerName, htmlContent }) => {
         let win = null;
         try {
             win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
