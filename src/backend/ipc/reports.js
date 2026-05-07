@@ -60,7 +60,7 @@ function registerReportHandlers(handle) {
                     WHERE ${dateFilter.replace('created_at', 's.created_at')} ${categoryFilter}
                 `);
             } else {
-            const summary = queryOne(`SELECT COUNT(*) as transactions, SUM(net_amount) as net, SUM(discount) as discount FROM sales WHERE ${dateFilter}`);
+                summary = queryOne(`SELECT COUNT(*) as transactions, SUM(net_amount) as net, SUM(discount) as discount FROM sales WHERE ${dateFilter}`);
             }
 
             const purchaseData = queryOne(`SELECT SUM(total_cost) as total_spent FROM purchase_orders WHERE status = 'received' AND ${dateFilter}`);
