@@ -7,11 +7,23 @@ function registerProductHandlers(handle) {
         const todaySales = queryOne("SELECT COUNT(*) as c FROM sales WHERE date(created_at) = date('now', 'localtime')")?.c || 0;
         const todayRevenue = queryOne("SELECT SUM(net_amount) as s FROM sales WHERE date(created_at) = date('now', 'localtime')")?.s || 0;
         
+        // Accurate Today's Profit calculation
+        const profitData = queryOne(`
+            SELECT SUM((si.unit_price - CASE WHEN si.cost_price > 0 THEN si.cost_price ELSE IFNULL(p.cost_price, 0) END) * si.quantity) as gross
+            FROM sale_items si
+            JOIN products p ON si.product_id = p.id
+            JOIN sales s ON si.sale_id = s.id
+            WHERE date(s.created_at) = date('now', 'localtime')
+        `);
+        const todayDiscount = queryOne("SELECT SUM(discount) as d FROM sales WHERE date(created_at) = date('now', 'localtime')")?.d || 0;
+        const todayProfit = (profitData.gross || 0) - todayDiscount;
+
         return {
             totalProducts,
             lowStock,
             todaySales,
-            todayRevenue: todayRevenue || 0
+            todayRevenue: todayRevenue || 0,
+            todayProfit: todayProfit || 0
         };
     });
 

@@ -118,7 +118,7 @@
             document.getElementById('stat-expired').innerText = expiredCount;
             
             // Basic profit calculation (assuming 20% margin for demo if not in DB yet)
-            document.getElementById('stat-profit').innerText = 'Rs. ' + (stats.todayRevenue * 0.2).toLocaleString();
+            document.getElementById('stat-profit').innerText = 'Rs. ' + stats.todayProfit.toLocaleString();
 
             // Load Low Stock Table
             const lowStockItems = await window.electron.invoke('get-inventory-report');

@@ -60,9 +60,11 @@ function registerReportHandlers(handle) {
                     WHERE ${dateFilter.replace('created_at', 's.created_at')} ${categoryFilter}
                 `);
             } else {
-                summary = queryOne(`SELECT COUNT(*) as transactions, SUM(net_amount) as net, SUM(discount) as discount FROM sales WHERE ${dateFilter}`);
+            const summary = queryOne(`SELECT COUNT(*) as transactions, SUM(net_amount) as net, SUM(discount) as discount FROM sales WHERE ${dateFilter}`);
             }
 
+            const purchaseData = queryOne(`SELECT SUM(total_cost) as total_spent FROM purchase_orders WHERE status = 'received' AND ${dateFilter}`);
+            
             const profitData = queryOne(`
                 SELECT SUM((si.unit_price - CASE WHEN si.cost_price > 0 THEN si.cost_price ELSE IFNULL(p.cost_price, 0) END) * si.quantity) as gross_profit
                 FROM sale_items si
