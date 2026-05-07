@@ -38,13 +38,20 @@
         <div class="content">
             <div class="card" style="margin-bottom: 24px;">
                 <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-                    <div class="form-group" style="margin:0; flex:1; min-width:200px;">
-                        <label>Report Type</label>
+                    <div class="form-group" style="margin:0; flex:1; min-width:180px;">
+                        <label>Range</label>
                         <select id="report-range" onchange="handleRangeChange()">
-                            <option value="daily">Daily Report</option>
+                            <option value="today">Today's Report</option>
+                            <option value="3days">Last 3 Days</option>
                             <option value="weekly">Weekly Report</option>
                             <option value="monthly">Monthly Report</option>
-                            <option value="custom">Custom Date Range</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0; flex:1; min-width:180px;">
+                        <label>Category</label>
+                        <select id="report-category" onchange="renderReport()">
+                            <option value="All">All Categories</option>
                         </select>
                     </div>
                     <div id="custom-dates" style="display: none; gap: 15px; flex: 2; min-width:300px;">
@@ -82,12 +89,13 @@
             const range = document.getElementById('report-range').value;
             const from = document.getElementById('date-from').value;
             const to = document.getElementById('date-to').value;
+            const category = document.getElementById('report-category').value;
 
             const container = document.getElementById('report-content');
             container.innerHTML = `<div style="display:flex; justify-content:center; padding:50px;"><i data-lucide="loader-2" class="spin" style="width:32px; height:32px; color:var(--primary);"></i></div>`;
             lucide.createIcons();
 
-            const data = await window.electron.invoke('get-report-data', { range, from, to });
+            const data = await window.electron.invoke('get-report-data', { range, from, to, category });
             
             if (!data.success) {
                 container.innerHTML = `
@@ -232,17 +240,24 @@
             });
         }
 
-        async function updateBusinessName() {
-            const settings = await window.electron.invoke('get-settings');
-            if (settings.mart_name) {
-                const title = document.querySelector('.sidebar h2');
-                if (title) title.innerHTML = `<i data-lucide="layout-grid"></i> ${settings.mart_name}`;
-                lucide.createIcons();
-            }
+        async function loadCategories() {
+            const categories = await window.electron.invoke('get-category-sales');
+            const select = document.getElementById('report-category');
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.category;
+                opt.innerText = c.category;
+                select.appendChild(opt);
+            });
         }
 
-        renderReport();
-        updateBusinessName();
+        async function init() {
+            await loadCategories();
+            renderReport();
+            updateBusinessName();
+        }
+
+        init();
     </script>
 </body>
 </html>
