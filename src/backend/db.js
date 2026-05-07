@@ -85,8 +85,16 @@ function ensureTables() {
         barcode TEXT,
         quantity INTEGER,
         unit_price REAL,
+        cost_price REAL DEFAULT 0,
         subtotal REAL
     );`);
+
+    // Migration: Add cost_price to sale_items if it doesn't exist
+    try {
+        db.run("ALTER TABLE sale_items ADD COLUMN cost_price REAL DEFAULT 0;");
+    } catch (e) {
+        // Column already exists, ignore
+    }
 
     // Purchase Orders
     db.run(`CREATE TABLE IF NOT EXISTS purchase_orders (

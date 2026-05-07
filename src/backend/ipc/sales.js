@@ -17,14 +17,14 @@ function registerSalesHandlers(handle) {
             const saleId = saleRow.id;
 
             for (const item of items) {
-                const product = queryOne('SELECT quantity, name FROM products WHERE id = ?', [item.id]);
+                const product = queryOne('SELECT quantity, name, cost_price FROM products WHERE id = ?', [item.id]);
                 if (!product || product.quantity < item.quantity) {
                     db.run('ROLLBACK');
                     return { success: false, error: `Insufficient stock for ${product ? product.name : 'Unknown Product'}.` };
                 }
 
-                const itemStmt = db.prepare('INSERT INTO sale_items (sale_id, product_id, product_name, barcode, quantity, unit_price, subtotal) VALUES (?,?,?,?,?,?,?)');
-                itemStmt.run([saleId, item.id, item.name, item.barcode, item.quantity, item.sale_price, item.quantity * item.sale_price]);
+                const itemStmt = db.prepare('INSERT INTO sale_items (sale_id, product_id, product_name, barcode, quantity, unit_price, cost_price, subtotal) VALUES (?,?,?,?,?,?,?,?)');
+                itemStmt.run([saleId, item.id, item.name, item.barcode, item.quantity, item.sale_price, product.cost_price || 0, item.quantity * item.sale_price]);
                 itemStmt.free();
 
                 const stockStmt = db.prepare('UPDATE products SET quantity = quantity - ? WHERE id = ?');

@@ -63,15 +63,16 @@ function registerReportHandlers(handle) {
                 summary = queryOne(`SELECT COUNT(*) as transactions, SUM(net_amount) as net, SUM(discount) as discount FROM sales WHERE ${dateFilter}`);
             }
 
-            const purchaseData = queryOne(`SELECT SUM(total_cost) as total_spent FROM purchase_orders WHERE status = 'received' AND ${dateFilter}`);
-            
             const profitData = queryOne(`
-                SELECT SUM((si.unit_price - IFNULL(p.cost_price, 0)) * si.quantity) as total_profit
+                SELECT SUM((si.unit_price - CASE WHEN si.cost_price > 0 THEN si.cost_price ELSE IFNULL(p.cost_price, 0) END) * si.quantity) as gross_profit
                 FROM sale_items si
                 JOIN products p ON si.product_id = p.id
                 JOIN sales s ON si.sale_id = s.id
-                WHERE ${dateFilter.replace('created_at', 's.created_at')} ${category ? ` AND p.category = '${category}'` : ''}
+                WHERE ${dateFilter.replace('created_at', 's.created_at')} ${category && category !== 'All' ? ` AND p.category = '${category}'` : ''}
             `);
+
+            const totalDiscount = summary.discount || 0;
+            const netProfit = (profitData.gross_profit || 0) - totalDiscount;
 
             let sales;
             if (category && category !== 'All') {
@@ -92,7 +93,7 @@ function registerReportHandlers(handle) {
                 net: summary.net || 0,
                 discount: summary.discount || 0,
                 totalPurchases: purchaseData.total_spent || 0,
-                profit: profitData.total_profit || 0,
+                profit: netProfit,
                 sales: sales
             };
         } catch (err) {
