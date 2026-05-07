@@ -4,6 +4,7 @@
     <title>Mart Management - Sales History</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="../assets/js/common.js"></script>
 </head>
 <body>
     <div class="sidebar">
@@ -45,6 +46,17 @@
                         <tbody id="sales-list"></tbody>
                     </table>
                 </div>
+                <!-- Pagination Controls -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-top: 1px solid var(--border);">
+                    <div style="font-size: 0.875rem; color: var(--text-muted);">
+                        Showing page <span id="current-page-num" style="font-weight: 600; color: var(--text);">1</span> 
+                        of <span id="total-pages-num">1</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" id="prev-btn" onclick="changePage(-1)" disabled><i data-lucide="chevron-left"></i> Previous</button>
+                        <button class="btn btn-outline" id="next-btn" onclick="changePage(1)">Next <i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -68,13 +80,15 @@
                             <th>Quantity</th>
                             <th>Unit Price</th>
                             <th>Subtotal</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="items-list"></tbody>
                 </table>
             </div>
 
-            <div class="modal-footer" style="margin-top: 24px;">
+            <div class="modal-footer" style="margin-top: 24px; justify-content: space-between;">
+                <button id="modal-refund-btn" class="btn btn-danger" style="display: none;">Full Refund Receipt</button>
                 <button class="btn btn-primary" onclick="hideItemsModal()">Close</button>
             </div>
         </div>
@@ -83,9 +97,21 @@
 
     <script>
         lucide.createIcons();
+        let currentPage = 1;
+        const pageSize = 20;
 
         async function loadSales() {
-            const sales = await window.electron.invoke('get-sales-history');
+            const totalSales = await handleIPC('get-sales-count');
+            const totalPages = Math.ceil(totalSales / pageSize) || 1;
+            
+            document.getElementById('total-pages-num').innerText = totalPages;
+            document.getElementById('current-page-num').innerText = currentPage;
+            
+            // Enable/Disable buttons
+            document.getElementById('prev-btn').disabled = currentPage <= 1;
+            document.getElementById('next-btn').disabled = currentPage >= totalPages;
+
+            const sales = await handleIPC('get-sales-history', { page: currentPage, pageSize });
             const list = document.getElementById('sales-list');
             list.innerHTML = '';
             
@@ -97,12 +123,43 @@
                     <td style="font-weight: 700;">Rs ${s.net_amount.toLocaleString()}</td>
                     <td><span class="badge badge-gray">${s.payment_method}</span></td>
                     <td>
-                        <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8rem;" onclick="viewItems(${s.id}, '${s.receipt_number}')">View Items</button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline" style="padding: 5px 12px;" onclick="viewItems(${s.id}, '${s.receipt_number}')">Details</button>
+                            <button class="btn btn-danger" style="padding: 5px 12px;" onclick="refundSale(${s.id}, '${s.receipt_number}')">Refund</button>
+                        </div>
                     </td>
                 `;
                 list.appendChild(tr);
             });
             lucide.createIcons();
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            loadSales();
+        }
+
+        async function refundSale(saleId, receiptNo) {
+            if (!confirm(`Are you sure you want to refund FULL Receipt ${receiptNo}? This will return ALL items to stock.`)) return;
+            
+            const res = await handleIPC('refund-sale', saleId);
+            if (res.success) {
+                showToast('Full sale refunded and stock updated.');
+                hideItemsModal();
+                loadSales();
+            }
+        }
+
+        async function returnItem(saleId, itemId, productId, quantity, unitPrice, name) {
+            if (!confirm(`Return ${quantity}x ${name} to stock?`)) return;
+
+            const res = await handleIPC('return-sale-item', { saleId, itemId, productId, quantity, unitPrice });
+            if (res.success) {
+                showToast('Item returned successfully.');
+                const receiptNo = document.getElementById('items-subtitle').innerText.split(': ')[1];
+                viewItems(saleId, receiptNo);
+                loadSales();
+            }
         }
 
         async function viewItems(saleId, receiptNo) {
@@ -121,9 +178,19 @@
                     <td>${item.quantity}</td>
                     <td>Rs ${item.unit_price.toLocaleString()}</td>
                     <td style="font-weight: 600;">Rs ${item.subtotal.toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="returnItem(${saleId}, ${item.id}, ${item.product_id}, ${item.quantity}, ${item.unit_price}, '${item.product_name}')">Return</button>
+                    </td>
                 `;
                 list.appendChild(tr);
             });
+
+            // Add full refund button to modal footer
+            const footer = document.querySelector('.modal-footer');
+            footer.innerHTML = `
+                <button class="btn btn-danger" style="margin-right: auto;" onclick="refundSale(${saleId}, '${receiptNo}')">Full Refund</button>
+                <button class="btn btn-primary" onclick="hideItemsModal()">Close</button>
+            `;
             
             document.getElementById('items-modal').style.display = 'flex';
             lucide.createIcons();

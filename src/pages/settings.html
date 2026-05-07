@@ -47,11 +47,18 @@
                         <h3 style="margin: 0;">Database Management</h3>
                     </div>
                     <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 20px;">
-                        Secure your data by creating a backup to your local D: drive. 
+                        Secure your data by creating a backup to your chosen folder or drive.
                     </p>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Backup Location</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="backup-path" value="D:\MartBackups" readonly style="flex: 1; font-size: 0.8rem;">
+                            <button class="btn btn-outline" onclick="selectFolder()" style="padding: 8px 12px;"><i data-lucide="folder"></i></button>
+                        </div>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 12px;">
                         <button class="btn btn-primary" onclick="runBackup()" style="width: 100%; justify-content: center; gap: 8px;">
-                            <i data-lucide="save" style="width: 18px;"></i> Create Immediate Backup (D:/)
+                            <i data-lucide="save" style="width: 18px;"></i> Create Immediate Backup
                         </button>
                         <div id="backup-status" style="display: none; font-size: 0.8rem; padding: 10px; border-radius: 8px;"></div>
                     </div>
@@ -69,12 +76,26 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px;">
                         <div>
                             <div style="font-weight: 600;">Current Version</div>
-                            <div style="font-size: 0.875rem; color: var(--text-muted);">v1.0.4 (Production)</div>
+                            <div id="version-display" style="font-size: 0.875rem; color: var(--text-muted);">Loading...</div>
                         </div>
-                        <span class="status-pill success">Up to Date</span>
+                        <span id="version-pill" class="status-pill info">Checking...</span>
                     </div>
-                    <button class="btn btn-outline" onclick="checkUpdates()" style="width: 100%; justify-content: center; gap: 8px;">
-                        <i data-lucide="search" style="width: 18px;"></i> Check for Updates
+
+                    <div id="update-container" style="display: none; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px;">
+                            <span id="update-msg" style="color: var(--primary);">Downloading update...</span>
+                            <span id="update-percent">0%</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: #f3f4f6; border-radius: 10px; overflow: hidden;">
+                            <div id="update-progress-bar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+
+                    <button id="update-btn" class="btn btn-outline" onclick="triggerUpdateCheck()" style="width: 100%; justify-content: center; gap: 8px;">
+                        <i data-lucide="refresh-cw" style="width: 18px;"></i> Check for Updates
+                    </button>
+                    <button id="restart-btn" class="btn btn-primary" onclick="restartAndInstall()" style="display: none; width: 100%; justify-content: center; gap: 8px;">
+                        <i data-lucide="zap" style="width: 18px;"></i> Restart and Update Now
                     </button>
                     <div id="update-status" style="display: none; margin-top: 15px; font-size: 0.85rem; text-align: center; color: var(--text-muted);"></div>
                 </div>
@@ -87,7 +108,15 @@
                     </div>
                     <div class="form-group">
                         <label>Mart Name</label>
-                        <input type="text" id="mart-name" value="MartOS Management">
+                        <input type="text" id="mart-name" value="MartOS">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Number</label>
+                        <input type="text" id="mart-phone" placeholder="e.g. 0300-1234567">
+                    </div>
+                    <div class="form-group">
+                        <label>Store Address</label>
+                        <input type="text" id="mart-address" placeholder="e.g. Main Street, City">
                     </div>
                     <div class="form-group">
                         <label>Receipt Footer Note</label>
@@ -116,13 +145,57 @@
 
         async function loadSettings() {
             const settings = await window.electron.invoke('get-settings');
-            if (settings.mart_name) {
-                document.getElementById('mart-name').value = settings.mart_name;
-            }
-            if (settings.receipt_footer) {
-                document.getElementById('receipt-footer').value = settings.receipt_footer;
-            }
+            if (settings.mart_name) document.getElementById('mart-name').value = settings.mart_name;
+            if (settings.mart_phone) document.getElementById('mart-phone').value = settings.mart_phone;
+            if (settings.mart_address) document.getElementById('mart-address').value = settings.mart_address;
+            if (settings.receipt_footer) document.getElementById('receipt-footer').value = settings.receipt_footer;
+            if (settings.backup_path) document.getElementById('backup-path').value = settings.backup_path;
+            
             updateSidebarName(settings.mart_name || 'MartOS');
+
+            // Load Version
+            const version = await window.electron.invoke('get-version');
+            document.getElementById('version-display').innerText = `v${version} (Production)`;
+            document.getElementById('version-pill').innerText = 'System Ready';
+        }
+
+        // Auto-Update Listeners
+        window.electron.on('update-status', (msg) => {
+            document.getElementById('update-status').innerText = msg;
+            document.getElementById('update-status').style.display = 'block';
+        });
+
+        window.electron.on('update-available', (info) => {
+            document.getElementById('update-status').innerText = `New version ${info.version} available!`;
+            document.getElementById('version-pill').innerText = 'Update Available';
+            document.getElementById('version-pill').classList.remove('info');
+            document.getElementById('version-pill').classList.add('success');
+            document.getElementById('update-container').style.display = 'block';
+        });
+
+        window.electron.on('update-progress', (percent) => {
+            const p = Math.round(percent);
+            document.getElementById('update-progress-bar').style.width = p + '%';
+            document.getElementById('update-percent').innerText = p + '%';
+            document.getElementById('update-msg').innerText = 'Downloading update...';
+            document.getElementById('update-container').style.display = 'block';
+        });
+
+        window.electron.on('update-downloaded', (info) => {
+            document.getElementById('update-msg').innerText = 'Update ready to install!';
+            document.getElementById('update-percent').innerText = '100%';
+            document.getElementById('update-btn').style.display = 'none';
+            document.getElementById('restart-btn').style.display = 'flex';
+            document.getElementById('update-status').innerText = 'Version ' + info.version + ' is ready.';
+        });
+
+        window.electron.on('update-error', (err) => {
+            document.getElementById('update-status').innerText = 'Update error: ' + err;
+            document.getElementById('update-status').style.color = 'var(--danger)';
+        });
+
+        function restartAndInstall() {
+            window.electron.invoke('quit-and-install');
         }
 
         function updateSidebarName(name) {
@@ -136,7 +209,10 @@
         async function saveSettings() {
             const settings = {
                 mart_name: document.getElementById('mart-name').value,
-                receipt_footer: document.getElementById('receipt-footer').value
+                mart_phone: document.getElementById('mart-phone').value,
+                mart_address: document.getElementById('mart-address').value,
+                receipt_footer: document.getElementById('receipt-footer').value,
+                backup_path: document.getElementById('backup-path').value
             };
             
             const btn = event.target;
@@ -163,14 +239,15 @@
 
         async function runBackup() {
             const status = document.getElementById('backup-status');
+            const path = document.getElementById('backup-path').value;
             status.style.display = 'block';
             status.style.background = '#eff6ff';
             status.style.color = '#1e40af';
-            status.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:14px; vertical-align:middle;"></i> Copying database to D:/Partition...';
+            status.innerHTML = `<i data-lucide="loader-2" class="spin" style="width:14px; vertical-align:middle;"></i> Copying database to ${path}...`;
             lucide.createIcons();
 
             try {
-                const res = await window.electron.invoke('create-backup-to-d');
+                const res = await window.electron.invoke('create-backup', path);
                 if (res.success) {
                     status.style.background = '#f0fdf4';
                     status.style.color = '#166534';
@@ -186,17 +263,22 @@
             lucide.createIcons();
         }
 
-        function checkUpdates() {
-            const btn = event.target.closest('button');
+        async function selectFolder() {
+            const path = await window.electron.invoke('select-backup-dir');
+            if (path) {
+                document.getElementById('backup-path').value = path;
+                // Auto-save the path
+                saveSettings();
+            }
+        }
+
+        async function triggerUpdateCheck() {
             const status = document.getElementById('update-status');
-            btn.disabled = true;
             status.style.display = 'block';
-            status.innerHTML = 'Checking Galaxy servers...';
-            
-            setTimeout(() => {
-                status.innerHTML = 'Your system is running the latest version of MartOS (v1.0.4).';
-                btn.disabled = false;
-            }, 2000);
+            status.innerHTML = '<i data-lucide="loader-2" class="spin" style="width:14px; vertical-align:middle;"></i> Connecting to MartOS Update Servers...';
+            lucide.createIcons();
+
+            await window.electron.invoke('check-for-updates');
         }
 
         loadSettings();

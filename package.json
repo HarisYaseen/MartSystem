@@ -1,34 +1,55 @@
 {
   "name": "mart-management-system",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "description": "Mart Management System - Lightweight Edition",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "desktop:dev": "electron .",
-    "desktop:start": "electron .",
-    "build": "electron-builder"
+    "dev": "electron .",
+    "lint": "eslint src/**",
+    "format": "prettier --write src/**",
+    "test": "jest"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "electron": "^34.5.8",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "jest": "^30.3.0",
+    "prettier": "^3.8.3"
   },
   "build": {
     "appId": "com.mart.management",
-    "productName": "Mart Management",
+    "productName": "MartOS Management",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "HarisYaseen",
+        "repo": "MartOS-RElease"
+      }
+    ],
     "directories": {
-      "output": "dist"
+      "output": "release"
     },
     "win": {
       "target": "nsis"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true,
+      "artifactName": "MartOS-Management-Setup-${version}.${ext}"
+    },
     "files": [
       "src/**/*",
       "package.json",
-      "node_modules/sql.js/**/*"
+      "node_modules/**/*"
     ]
   }
 }

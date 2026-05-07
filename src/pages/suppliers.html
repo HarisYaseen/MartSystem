@@ -49,8 +49,7 @@
                             <tr>
                                 <th>Company Name</th>
                                 <th>Contact Person</th>
-                                <th>Contact Info</th>
-                                <th>Added On</th>
+                                <th>Balance (PKR)</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -61,6 +60,105 @@
         </div>
     </div>
 
+    <!-- Add Modal -->
+    <!-- Ledger Modal -->
+    <div id="ledger-modal" class="modal">
+        <div class="modal-content" style="width: 800px;">
+            <div class="modal-header">
+                <div>
+                    <h2 id="ledger-title" style="margin:0;">Supplier Ledger</h2>
+                    <p id="ledger-subtitle" style="color:var(--text-muted); font-size:0.875rem; margin-top:4px;"></p>
+                </div>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="document.getElementById('ledger-modal').style.display='none'"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 10px;">
+                <div style="font-size: 1.1rem; font-weight: 700;">Current Balance: <span id="ledger-balance" style="color: var(--danger);">Rs 0</span></div>
+                <button class="btn btn-primary" onclick="showPaymentModal()"><i data-lucide="credit-card"></i> Pay Supplier</button>
+            </div>
+
+            <div class="card" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Debit (Purchase)</th>
+                            <th>Credit (Paid/Ret)</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledger-list"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: space-between;">
+                <button class="btn btn-outline" onclick="showAdjustmentModal()"><i data-lucide="plus"></i> Add Adjustment</button>
+                <button class="btn btn-primary" onclick="document.getElementById('ledger-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="adjustment-modal" class="modal" style="z-index: 1200;">
+        <div class="modal-content" style="width: 400px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+            <div class="modal-header">
+                <h2>Manual Adjustment</h2>
+                <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="document.getElementById('adjustment-modal').style.display='none'"><i data-lucide="x"></i></button>
+            </div>
+            <form id="adjustment-form">
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="adj-desc" placeholder="e.g. Return missed in ledger" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="adj-type">
+                        <option value="credit">Credit (Decrease Balance/Return)</option>
+                        <option value="debit">Debit (Increase Balance/Purchase)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount (PKR)</label>
+                    <input type="number" id="adj-amount" required step="any" placeholder="0.00">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('adjustment-modal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Adjustment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content" style="width: 450px;">
+            <div class="modal-header">
+                <h2>Record Payment</h2>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="document.getElementById('payment-modal').style.display='none'"><i data-lucide="x"></i></button>
+            </div>
+            <form id="payment-form">
+                <div class="form-group">
+                    <label>Amount to Pay (PKR)</label>
+                    <input type="number" id="pay-amount" required step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="pay-method">
+                        <option value="Cash">Cash</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reference (optional)</label>
+                    <input type="text" id="pay-ref" placeholder="Transaction ID / Cheque #">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('payment-modal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <!-- Add Modal -->
     <div id="supplier-modal" class="modal">
         <div class="modal-content">
@@ -110,27 +208,137 @@
             
             suppliers.forEach(s => {
                 const tr = document.createElement('tr');
+                const bal = s.current_balance || 0;
                 tr.innerHTML = `
                     <td>
                         <div style="font-weight: 600;">${s.name}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="map-pin" style="width:10px; height:10px;"></i> ${s.address || 'No Address'}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="phone" style="width:10px; height:10px;"></i> ${s.phone || '-'}</div>
                     </td>
                     <td>${s.contact_name || '-'}</td>
-                    <td>
-                        <div style="font-size: 0.85rem;"><i data-lucide="mail" style="width:12px; height:12px;"></i> ${s.email || '-'}</div>
-                        <div style="font-size: 0.85rem;"><i data-lucide="phone" style="width:12px; height:12px;"></i> ${s.phone || '-'}</div>
+                    <td style="font-weight: 700; color: ${bal > 0 ? 'var(--danger)' : 'var(--success)'};">
+                        Rs ${bal.toLocaleString()}
                     </td>
-                    <td style="color: var(--text-muted); font-size: 0.85rem;">${s.created_at || '-'}</td>
                     <td>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-outline" style="padding: 6px;"><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>
-                            <button class="btn btn-danger" style="padding: 6px;"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>
+                            <button class="btn btn-outline" style="padding: 6px 12px; font-size:0.8rem;" onclick='viewLedger(${JSON.stringify(s)})'><i data-lucide="book-open" style="width: 14px; margin-right:4px;"></i> Ledger</button>
+                            <button class="btn btn-outline" style="padding: 6px;" onclick='editSupplier(${JSON.stringify(s)})'><i data-lucide="edit-3" style="width: 16px; height: 16px;"></i></button>
                         </div>
                     </td>
                 `;
                 list.appendChild(tr);
             });
             lucide.createIcons();
+        }
+
+        let selectedSupplier = null;
+
+        async function recalculateBalance() {
+            if (!selectedSupplier) return;
+            if (!confirm('This will audit all ledger entries and correct the balance. Continue?')) return;
+            
+            const res = await window.electron.invoke('recalculate-supplier-balance', selectedSupplier.id);
+            if (res.success) {
+                alert('Balance corrected! New Balance: Rs ' + res.newBalance.toLocaleString());
+                const suppliers = await window.electron.invoke('get-suppliers');
+                const updated = suppliers.find(s => s.id === selectedSupplier.id);
+                viewLedger(updated);
+                loadSuppliers();
+            }
+        }
+
+        async function viewLedger(s) {
+            selectedSupplier = s;
+            document.getElementById('ledger-title').innerText = s.name;
+            document.getElementById('ledger-subtitle').innerText = `Contact: ${s.contact_name || 'N/A'} | Phone: ${s.phone || 'N/A'}`;
+            document.getElementById('ledger-balance').innerText = `Rs ${(s.current_balance || 0).toLocaleString()}`;
+            
+            const ledger = await window.electron.invoke('get-supplier-ledger', s.id);
+            const list = document.getElementById('ledger-list');
+            list.innerHTML = '';
+            
+            ledger.forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-size:0.8rem; color:var(--text-muted);">${entry.created_at}</td>
+                    <td><div style="font-weight:600;">${entry.description}</div><div style="font-size:0.7rem; color:var(--text-muted);">${entry.ref_number}</div></td>
+                    <td style="color:var(--danger);">${entry.debit ? 'Rs ' + entry.debit.toLocaleString() : '-'}</td>
+                    <td style="color:var(--success);">${entry.credit ? 'Rs ' + entry.credit.toLocaleString() : '-'}</td>
+                    <td style="font-weight:700;">Rs ${entry.balance.toLocaleString()}</td>
+                `;
+                list.appendChild(tr);
+            });
+            
+            document.getElementById('ledger-modal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function showAdjustmentModal() {
+            document.getElementById('adjustment-form').reset();
+            document.getElementById('adjustment-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('adj-desc').focus(), 50);
+        }
+
+        document.getElementById('adjustment-form').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!selectedSupplier) return;
+            
+            const amount = parseFloat(document.getElementById('adj-amount').value);
+            const type = document.getElementById('adj-type').value;
+            const description = document.getElementById('adj-desc').value;
+
+            const res = await window.electron.invoke('add-supplier-adjustment', {
+                supplierId: selectedSupplier.id,
+                amount, type, description
+            });
+
+            if (res.success) {
+                document.getElementById('adjustment-modal').style.display = 'none';
+                loadSuppliers();
+                const suppliers = await window.electron.invoke('get-suppliers');
+                const updated = suppliers.find(s => s.id === selectedSupplier.id);
+                viewLedger(updated);
+            } else {
+                alert('Adjustment failed: ' + res.error);
+            }
+        };
+
+        function showPaymentModal() {
+            document.getElementById('payment-form').reset();
+            document.getElementById('payment-modal').style.display = 'flex';
+            document.getElementById('pay-amount').focus();
+        }
+
+        document.getElementById('payment-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(document.getElementById('pay-amount').value);
+            const method = document.getElementById('pay-method').value;
+            const ref = document.getElementById('pay-ref').value;
+
+            const res = await window.electron.invoke('add-supplier-payment', {
+                supplierId: selectedSupplier.id,
+                amount,
+                method,
+                ref
+            });
+
+            if (res.success) {
+                document.getElementById('payment-modal').style.display = 'none';
+                loadSuppliers(); // Refresh main list for balance
+                // Refresh ledger view if open
+                const suppliers = await window.electron.invoke('get-suppliers');
+                const updated = suppliers.find(s => s.id === selectedSupplierId);
+                if (updated) viewLedger(updated);
+            }
+        };
+
+        function editSupplier(s) {
+            document.getElementById('s-id').value = s.id;
+            document.getElementById('s-name').value = s.name;
+            document.getElementById('s-contact').value = s.contact_name;
+            document.getElementById('s-phone').value = s.phone;
+            document.getElementById('s-email').value = s.email;
+            document.getElementById('s-address').value = s.address;
+            document.getElementById('supplier-modal').style.display = 'flex';
         }
 
         function showModal() {

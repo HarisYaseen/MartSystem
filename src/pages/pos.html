@@ -4,6 +4,7 @@
     <title>Mart Management - POS Terminal</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="../assets/js/common.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         .payment-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
@@ -63,18 +64,27 @@
     <div id="receipt-modal" class="receipt-modal">
         <div class="receipt-content">
             <div style="display: flex; justify-content: flex-end; margin-bottom: -10px;">
-                <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="closeReceipt()"><i data-lucide="x" style="width: 20px;"></i></button>
+                <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="hideReceiptModal()"><i data-lucide="x" style="width: 20px;"></i></button>
             </div>
-            <div class="receipt-header">
-                <div style="background: var(--primary); color: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px;">
-                    <i data-lucide="dollar-sign"></i>
-                </div>
-                <h2>Receipt</h2>
-                <p style="color: var(--success); font-weight: 500;">Sale completed successfully.</p>
-                <div style="margin-top: 20px;">
-                    <h3 style="margin-bottom: 4px;">MartOS</h3>
-                    <p id="receipt-date" style="font-size: 0.85rem; color: var(--text-muted);"></p>
-                    <p id="receipt-no" style="font-size: 0.85rem; color: var(--text-muted);"></p>
+            <div class="receipt-header" style="text-align: center;">
+                <h2 style="margin: 0;">Receipt</h2>
+                <p style="color: var(--success); font-weight: 500; font-size: 0.9rem; margin: 5px 0 0;">Sale completed successfully.</p>
+                <div style="margin-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <h2 id="receipt-mart-name" style="margin: 0; font-size: 1.5rem; color: var(--text); font-weight: 700;">MartOS</h2>
+                    <div id="receipt-contact-container" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
+                        <i data-lucide="phone" style="width: 12px; height: 12px;"></i>
+                        <span id="receipt-contact-info"></span>
+                    </div>
+                    <div id="receipt-address-container" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
+                        <i data-lucide="map-pin" style="width: 12px; height: 12px;"></i>
+                        <span id="receipt-address-info"></span>
+                    </div>
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); width: 100%;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+                            <span>Date: <span id="receipt-date"></span></span>
+                            <span>ID: <span id="receipt-no"></span></span>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="receipt-items" id="receipt-items"></div>
@@ -85,7 +95,7 @@
             </div>
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button class="btn btn-outline" style="flex: 1; padding: 14px;" onclick="printReceipt()"><i data-lucide="printer"></i> Print Receipt</button>
-                <button class="btn btn-primary" style="flex: 1; padding: 14px;" onclick="closeReceipt()">New Sale</button>
+                <button class="btn btn-primary" style="flex: 1; padding: 14px;" onclick="startNewSale()">New Sale</button>
             </div>
         </div>
     </div>
@@ -110,16 +120,16 @@
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-weight: 600;">
                             <i data-lucide="shopping-basket"></i> Cart
                         </div>
-                        <div class="cart-items" id="cart-list-container">
+                        <div class="cart-items" id="cart-list-container" style="max-height: 320px; overflow-y: auto; padding-right: 5px;">
                             <div class="cart-empty" id="empty-state">
-                                <i data-lucide="shopping-cart"></i>
+                                <i data-lucide="shopping-basket"></i>
                                 <div>
                                     <p style="font-weight: 600; color: var(--text);">Cart is empty</p>
                                     <p style="font-size: 0.875rem;">Scan a product barcode to begin</p>
                                 </div>
                             </div>
-                            <table id="cart-table" style="display: none;">
-                                <thead>
+                            <table id="cart-table" style="display: none; width: 100%;">
+                                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                                     <tr>
                                         <th>Product</th>
                                         <th>Price</th>
@@ -437,15 +447,15 @@
         }
 
         async function checkout() {
-            if (cart.length === 0) return alert('Cart is empty!');
+            if (cart.length === 0) return showToast('Cart is empty!', 'error');
             const sub = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0);
             const discount = parseFloat(document.getElementById('discount-input').value) || 0;
             const total = Math.max(0, sub - discount);
             const paid = parseFloat(document.getElementById('amount-paid').value) || 0;
 
-            if (paid < total) return alert('Insufficient payment!');
+            if (paid < total) return showToast('Insufficient payment amount!', 'error');
 
-            const res = await window.electron.invoke('process-sale', { 
+            const res = await handleIPC('process-sale', { 
                 items: cart, 
                 total: total, 
                 discount, 
@@ -456,12 +466,11 @@
             });
 
             if (res.success) {
+                showToast('Sale completed successfully!');
                 showReceipt(res.receiptNo, total, paid, currentMethod);
                 document.getElementById('amount-paid').value = '0';
                 document.getElementById('discount-input').value = '0';
                 barcodeInput.focus();
-            } else {
-                alert('Checkout failed: ' + res.error);
             }
         }
 
@@ -474,9 +483,24 @@
                 document.getElementById('receipt-paid-label').innerText = `Paid (${method})`;
                 document.getElementById('receipt-paid-val').innerText = 'Rs ' + paid.toLocaleString();
                 
-                // Dynamic header and footer
-                const martTitle = document.querySelector('#receipt-modal h3');
-                if (martTitle && settings.mart_name) martTitle.innerText = settings.mart_name;
+                // Dynamic business info
+                document.getElementById('receipt-mart-name').innerText = settings.mart_name || 'MartOS';
+                
+                const phoneContainer = document.getElementById('receipt-contact-container');
+                if (settings.mart_phone) {
+                    document.getElementById('receipt-contact-info').innerText = settings.mart_phone;
+                    phoneContainer.style.display = 'flex';
+                } else {
+                    phoneContainer.style.display = 'none';
+                }
+
+                const addrContainer = document.getElementById('receipt-address-container');
+                if (settings.mart_address) {
+                    document.getElementById('receipt-address-info').innerText = settings.mart_address;
+                    addrContainer.style.display = 'flex';
+                } else {
+                    addrContainer.style.display = 'none';
+                }
                 
                 let footer = document.getElementById('receipt-footer-note');
                 if (!footer) {
@@ -511,46 +535,92 @@
             });
         }
 
-        function closeReceipt() {
+        function hideReceiptModal() {
+            document.getElementById('receipt-modal').style.display = 'none';
+            barcodeInput.disabled = false;
+            setTimeout(() => barcodeInput.focus(), 50);
+        }
+
+        function startNewSale() {
             document.getElementById('receipt-modal').style.display = 'none';
             cart = [];
             renderCart();
-            barcodeInput.focus();
+            document.getElementById('amount-paid').value = '';
+            document.getElementById('discount-input').value = '0';
+            barcodeInput.disabled = false;
+            setTimeout(() => barcodeInput.focus(), 50);
         }
 
         async function printReceipt() {
             const printerName = await window.electron.invoke('get-thermal-printer');
             const settings = await window.electron.invoke('get-settings');
             
+            // Prepare thermal content (clean HTML)
+            const receiptDiv = document.querySelector('.receipt-content').cloneNode(true);
+            // Remove UI buttons from the print version
+            const buttons = receiptDiv.querySelectorAll('.btn, button');
+            buttons.forEach(b => b.remove());
+
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+                        body { 
+                            font-family: 'Inter', sans-serif; 
+                            width: 80mm; 
+                            margin: 0; 
+                            padding: 10px;
+                            color: #000;
+                        }
+                        .text-center { text-align: center; }
+                        .receipt-header { border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
+                        .receipt-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; }
+                        .receipt-footer { border-top: 1px dashed #000; padding-top: 10px; margin-top: 10px; font-size: 11px; text-align: center; }
+                        h2, h3 { margin: 5px 0; }
+                        .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 5px; }
+                        .divider { border-top: 1px solid #000; margin: 5px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="text-center">
+                        <h2>${settings.mart_name || 'MartOS'}</h2>
+                        <div style="font-size: 11px;">${settings.mart_phone || ''}</div>
+                        <div style="font-size: 11px;">${settings.mart_address || ''}</div>
+                        <div class="divider"></div>
+                        <div style="font-size: 11px;">Date: ${document.getElementById('receipt-date').innerText}</div>
+                        <div style="font-size: 11px;">No: ${document.getElementById('receipt-no').innerText}</div>
+                        <div class="divider"></div>
+                    </div>
+                    <div style="margin: 10px 0;">
+                        ${Array.from(document.querySelectorAll('.receipt-item')).map(item => item.outerHTML).join('')}
+                    </div>
+                    <div class="divider"></div>
+                    <div class="total-row">
+                        <span>Total:</span>
+                        <span>${document.getElementById('receipt-total').innerText}</span>
+                    </div>
+                    <div class="receipt-footer">
+                        ${settings.receipt_footer || 'Thank you for shopping!'}
+                    </div>
+                </body>
+                </html>
+            `;
+            
             if (printerName) {
-                // Prepare thermal content (clean HTML)
-                const receiptContent = document.querySelector('.receipt-content').cloneNode(true);
-                // Remove buttons from clone
-                receiptContent.querySelector('div[style*="display: flex; gap: 12px"]').remove();
-                receiptContent.querySelector('div[style*="justify-content: flex-end"]').remove();
-                
-                const html = `
-                    <html>
-                    <head>
-                        <style>
-                            body { font-family: 'Inter', sans-serif; padding: 0; margin: 0; text-align: center; width: 80mm; }
-                            .receipt-header { border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
-                            .receipt-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
-                            .receipt-footer { border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px; }
-                        </style>
-                    </head>
-                    <body>${receiptContent.innerHTML}</body>
-                    </html>
-                `;
-                
                 const res = await window.electron.invoke('print-receipt-silent', {
                     printerName: printerName,
                     htmlContent: html
                 });
-                
                 if (!res.success) alert('Printing failed: ' + res.error);
             } else {
-                window.print();
+                // If no printer detected, try window.print with a temporary window
+                const printWin = window.open('', '', 'width=400,height=600');
+                printWin.document.write(html);
+                printWin.document.close();
+                printWin.print();
+                printWin.close();
             }
         }
 

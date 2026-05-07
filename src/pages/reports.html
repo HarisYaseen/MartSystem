@@ -36,11 +36,30 @@
         </div>
 
         <div class="content">
-            <div class="tabs">
-                <div class="tab active" onclick="setTab('trends')">Sales Trends</div>
-                <div class="tab" onclick="setTab('category')">Category Sales</div>
-                <div class="tab" onclick="setTab('products')">Top Products</div>
-                <div class="tab" onclick="setTab('financials')">Financials</div>
+            <div class="card" style="margin-bottom: 24px;">
+                <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+                        <label>Report Type</label>
+                        <select id="report-range" onchange="handleRangeChange()">
+                            <option value="daily">Daily Report</option>
+                            <option value="weekly">Weekly Report</option>
+                            <option value="monthly">Monthly Report</option>
+                            <option value="custom">Custom Date Range</option>
+                        </select>
+                    </div>
+                    <div id="custom-dates" style="display: none; gap: 15px; flex: 2; min-width:300px;">
+                        <div class="form-group" style="margin:0; flex:1;">
+                            <label>From</label>
+                            <input type="date" id="date-from">
+                        </div>
+                        <div class="form-group" style="margin:0; flex:1;">
+                            <label>To</label>
+                            <input type="date" id="date-to">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" style="padding: 12px 24px;" onclick="renderReport()">Generate Report</button>
+                    <button class="btn btn-outline" onclick="window.print()" style="padding: 12px 24px;"><i data-lucide="printer"></i> Print</button>
+                </div>
             </div>
 
             <div id="report-content">
@@ -51,174 +70,179 @@
 
     <script>
         lucide.createIcons();
-        let currentTab = 'trends';
         let mainChart = null;
 
-        async function setTab(tab) {
-            currentTab = tab;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            event.target.classList.add('active');
-            renderReport();
+        function handleRangeChange() {
+            const range = document.getElementById('report-range').value;
+            document.getElementById('custom-dates').style.display = range === 'custom' ? 'flex' : 'none';
+            if (range !== 'custom') renderReport();
         }
 
         async function renderReport() {
-            const container = document.getElementById('report-content');
-            container.innerHTML = '';
+            const range = document.getElementById('report-range').value;
+            const from = document.getElementById('date-from').value;
+            const to = document.getElementById('date-to').value;
 
-            if (currentTab === 'trends') {
-                const sales = await window.electron.invoke('get-sales');
+            const container = document.getElementById('report-content');
+            container.innerHTML = `<div style="display:flex; justify-content:center; padding:50px;"><i data-lucide="loader-2" class="spin" style="width:32px; height:32px; color:var(--primary);"></i></div>`;
+            lucide.createIcons();
+
+            const data = await window.electron.invoke('get-report-data', { range, from, to });
+            
+            if (!data.success) {
                 container.innerHTML = `
-                    <div class="card">
-                        <h3>Daily Sales Trend</h3>
-                        <div class="chart-container"><canvas id="trendsChart"></canvas></div>
+                    <div class="card" style="text-align:center; padding:50px;">
+                        <i data-lucide="alert-circle" style="width:48px; height:48px; color:var(--danger); margin-bottom:15px;"></i>
+                        <h3>Failed to load report</h3>
+                        <p style="color:var(--text-muted);">${data.error}</p>
+                        <button class="btn btn-primary" style="margin-top:20px;" onclick="renderReport()">Retry</button>
                     </div>
                 `;
-                renderTrendsChart(sales);
-            } 
-            else if (currentTab === 'category') {
-                const data = await window.electron.invoke('get-category-sales');
-                container.innerHTML = `
-                    <div class="report-grid">
-                        <div class="card">
-                            <h3>Category Sales Breakdown</h3>
-                            <div class="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Category</th>
-                                            <th>Items Sold</th>
-                                            <th>Total Revenue</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${data.map(row => `
-                                            <tr>
-                                                <td><span class="badge badge-blue">${row.category}</span></td>
-                                                <td>${row.total_sold}</td>
-                                                <td style="font-weight:600;">Rs ${row.revenue.toLocaleString()}</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <h3>Revenue Split</h3>
-                            <div class="chart-container"><canvas id="categoryChart"></canvas></div>
-                        </div>
-                    </div>
-                `;
-                renderCategoryChart(data);
+                lucide.createIcons();
+                return;
             }
-            else if (currentTab === 'products') {
-                const data = await window.electron.invoke('get-top-products');
-                container.innerHTML = `
+
+            const margin = data.net > 0 ? ((data.profit / data.net) * 100).toFixed(1) : 0;
+            
+            container.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Transactions</div>
+                            <div class="stat-value">${data.transactions}</div>
+                        </div>
+                        <div class="stat-icon" style="background: #eff6ff; color: #3b82f6;"><i data-lucide="shopping-cart"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Net Revenue</div>
+                            <div class="stat-value">Rs ${data.net.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-icon" style="background: #f0fdf4; color: #10b981;"><i data-lucide="banknote"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Total Discounts</div>
+                            <div class="stat-value">Rs ${data.discount.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fef2f2; color: #ef4444;"><i data-lucide="percent"></i></div>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-top: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Stock Purchases (Expenses)</div>
+                            <div class="stat-value" style="color: var(--danger);">Rs ${(data.totalPurchases || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="stat-icon" style="background: #fff1f2; color: #e11d48;"><i data-lucide="trending-down"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Net Profit (After COGS)</div>
+                            <div class="stat-value" style="color: var(--primary);">Rs ${(data.profit || 0).toLocaleString()}</div>
+                            <div style="font-size: 0.75rem; color: var(--success); font-weight: 600; margin-top: 4px;">Margin: ${margin}%</div>
+                        </div>
+                        <div class="stat-icon" style="background: #eff6ff; color: #3b82f6;"><i data-lucide="trending-up"></i></div>
+                    </div>
+                </div>
+
+                <div class="report-grid" style="margin-bottom: 24px;">
                     <div class="card">
-                        <h3>Best Selling Products</h3>
-                        <div class="table-container">
-                            <table>
-                                <thead>
+                        <h3>Sales Trend (Last 30 Days)</h3>
+                        <div class="chart-container" style="height: 300px;"><canvas id="trendsChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <h3>Category Breakdown</h3>
+                        <div class="chart-container" style="height: 300px;"><canvas id="categoryChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 style="margin-bottom:20px;">Detailed Sales Summary</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Receipt #</th>
+                                    <th>Date & Time</th>
+                                    <th>Method</th>
+                                    <th>Total</th>
+                                    <th>Discount</th>
+                                    <th>Net Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.sales.length ? data.sales.map(s => `
                                     <tr>
-                                        <th>Product Name</th>
-                                        <th>Total Sold</th>
-                                        <th>Revenue Generated</th>
+                                        <td style="font-weight:600;">${s.receipt_number}</td>
+                                        <td>${new Date(s.created_at).toLocaleString()}</td>
+                                        <td><span class="badge badge-gray">${s.payment_method}</span></td>
+                                        <td>Rs ${s.total_amount.toLocaleString()}</td>
+                                        <td style="color:var(--danger);">-Rs ${s.discount.toLocaleString()}</td>
+                                        <td style="font-weight:700;">Rs ${s.net_amount.toLocaleString()}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.map(row => `
-                                        <tr>
-                                            <td style="font-weight:600;">${row.name}</td>
-                                            <td>${row.total_sold}</td>
-                                            <td style="color:var(--success); font-weight:600;">Rs ${row.revenue.toLocaleString()}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                                `).join('') : '<tr><td colspan="6" style="text-align:center; padding:40px; color:var(--text-muted);">No sales data found for this period.</td></tr>'}
+                            </tbody>
+                        </table>
                     </div>
-                `;
-            }
-            else if (currentTab === 'financials') {
-                const sales = await window.electron.invoke('get-sales');
-                const totalRev = sales.reduce((sum, s) => sum + s.net_amount, 0);
-                const totalSales = sales.length;
-                container.innerHTML = `
-                    <div class="stats-grid" style="margin-bottom: 24px;">
-                        <div class="stat-card">
-                            <span class="label">Total Lifetime Revenue</span>
-                            <span class="value">Rs ${totalRev.toLocaleString()}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Total Transactions</span>
-                            <span class="value">${totalSales}</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Average Order Value</span>
-                            <span class="value">Rs ${totalSales ? (totalRev / totalSales).toFixed(2) : 0}</span>
-                        </div>
-                    </div>
-                `;
-            }
+                </div>
+            `;
+            
+            // Render Charts
+            renderAnalytics();
             lucide.createIcons();
         }
 
-        function renderTrendsChart(sales) {
-            const ctx = document.getElementById('trendsChart').getContext('2d');
-            const daily = {};
-            sales.forEach(s => {
-                const date = s.created_at.split('T')[0];
-                daily[date] = (daily[date] || 0) + s.net_amount;
-            });
-
-            const labels = Object.keys(daily).sort();
-            const data = labels.map(l => daily[l]);
-
-            if (mainChart) mainChart.destroy();
-            mainChart = new Chart(ctx, {
+        async function renderAnalytics() {
+            const trends = await window.electron.invoke('get-sales-analytics');
+            const categories = await window.electron.invoke('get-category-sales');
+            
+            // Trends Chart
+            const tCtx = document.getElementById('trendsChart').getContext('2d');
+            if (window.trendsChartObj) window.trendsChartObj.destroy();
+            window.trendsChartObj = new Chart(tCtx, {
                 type: 'line',
                 data: {
-                    labels,
+                    labels: trends.map(d => d.date),
                     datasets: [{
-                        label: 'Daily Revenue',
-                        data,
+                        label: 'Revenue',
+                        data: trends.map(d => d.revenue),
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true,
-                        tension: 0.4
+                        fill: true, tension: 0.4
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // Category Chart
+            const cCtx = document.getElementById('categoryChart').getContext('2d');
+            if (window.categoryChartObj) window.categoryChartObj.destroy();
+            window.categoryChartObj = new Chart(cCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: categories.map(d => d.category),
+                    datasets: [{
+                        data: categories.map(d => d.revenue),
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
             });
         }
 
-        function renderCategoryChart(data) {
-            const ctx = document.getElementById('categoryChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.map(d => d.category),
-                    datasets: [{
-                        data: data.map(d => d.revenue),
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
+        async function updateBusinessName() {
+            const settings = await window.electron.invoke('get-settings');
+            if (settings.mart_name) {
+                const title = document.querySelector('.sidebar h2');
+                if (title) title.innerHTML = `<i data-lucide="layout-grid"></i> ${settings.mart_name}`;
+                lucide.createIcons();
+            }
         }
 
         renderReport();
+        updateBusinessName();
     </script>
 </body>
 </html>

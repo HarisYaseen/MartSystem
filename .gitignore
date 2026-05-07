@@ -5,3 +5,6 @@ dist/
 .DS_Store
 .env
 package-lock.json
+release/
+pnpm-lock.yaml
+.vscode/

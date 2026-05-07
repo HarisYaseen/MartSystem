@@ -60,6 +60,42 @@
         </div>
     </div>
 
+    <!-- View PO Modal -->
+    <div id="view-modal" class="modal">
+        <div class="modal-content" style="width: 700px;">
+            <div class="modal-header">
+                <div>
+                    <h2 id="view-po-title" style="margin:0;">PO Details</h2>
+                    <p id="view-po-subtitle" style="color:var(--text-muted); font-size:0.875rem; margin-top:4px;"></p>
+                </div>
+                <button class="btn btn-outline" style="padding: 5px;" onclick="document.getElementById('view-modal').style.display='none'"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="card" style="padding: 0;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Barcode</th>
+                            <th>Qty</th>
+                            <th>Unit Cost</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="view-po-items"></tbody>
+                </table>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <div id="view-po-total" style="font-size: 1.25rem; font-weight: 700;">Total: Rs 0.00</div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="document.getElementById('view-modal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Create PO Modal -->
     <div id="po-modal" class="modal">
         <div class="modal-content">
@@ -79,18 +115,20 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Scan Product to Add</label>
-                    <div style="display: flex; gap: 8px;">
+                    <label>Scan or Search Product</label>
+                    <div style="display: flex; gap: 8px; position: relative;">
                         <div style="position: relative; flex: 1;">
                             <i data-lucide="search" style="position: absolute; left: 10px; top: 10px; width: 16px; height: 16px; color: var(--text-muted);"></i>
-                            <input type="text" id="po-scan" placeholder="Scan barcode..." style="padding-left: 35px;">
+                            <input type="text" id="po-scan" placeholder="Scan barcode or type name..." style="padding-left: 35px;" autocomplete="off">
+                            <div id="po-search-results" class="card" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1100; padding: 0; margin-top: 5px; max-height: 200px; overflow-y: auto;"></div>
                         </div>
                         <button id="po-cam-btn" class="btn btn-outline" onclick="toggleScanner()"><i data-lucide="camera"></i></button>
+                        <button class="btn btn-outline" onclick="showQuickAdd()" title="Add New Product"><i data-lucide="plus-circle"></i></button>
                     </div>
                 </div>
             </div>
 
-            <div class="card" style="padding: 0; min-height: 200px;">
+            <div class="card" style="padding: 0; min-height: 250px;">
                 <table style="font-size: 0.85rem;">
                     <thead>
                         <tr>
@@ -99,10 +137,11 @@
                             <th>Qty</th>
                             <th>Unit Cost</th>
                             <th>Subtotal</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="po-items-list">
-                        <tr><td colspan="5" class="text-center" style="padding: 40px; color: var(--text-muted);">Scan products to add to this purchase order</td></tr>
+                        <tr><td colspan="6" class="text-center" style="padding: 40px; color: var(--text-muted);">Search or scan products to add</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -115,6 +154,72 @@
                 <button class="btn btn-outline" onclick="hideModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="submitPO()">Submit Order</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Quick Add Product Modal -->
+    <div id="quick-add-modal" class="modal">
+        <div class="modal-content" style="width: 500px; max-width: 95vw; overflow-x: hidden;">
+            <div class="modal-header" style="margin-bottom: 20px;">
+                <h2 style="margin: 0;">Quick Add Product</h2>
+                <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="document.getElementById('quick-add-modal').style.display='none'"><i data-lucide="x"></i></button>
+            </div>
+            <form id="quick-add-form" style="display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Barcode</label>
+                        <input type="text" id="qa-barcode" required style="width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Product Name</label>
+                        <input type="text" id="qa-name" required style="width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Brand</label>
+                        <input type="text" id="qa-brand" placeholder="Enter brand name" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Category</label>
+                        <input type="text" id="qa-category" value="General" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Cost Price (PKR)</label>
+                        <input type="number" id="qa-cost" value="0" step="0.01" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Sale Price (PKR)</label>
+                        <input type="number" id="qa-sale" value="0" step="0.01" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Initial Stock</label>
+                        <input type="number" id="qa-qty" value="0" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Reorder Level</label>
+                        <input type="number" id="qa-reorder" value="5" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Unit</label>
+                        <input type="text" id="qa-unit" value="pcs" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">Expiry Date</label>
+                        <input type="date" id="qa-expiry" style="width: 100%; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('quick-add-modal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">Save & Add to PO</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -132,15 +237,22 @@
                 const tr = document.createElement('tr');
                 const isPending = o.status === 'pending';
                 tr.innerHTML = `
-                    <td style="display: flex; align-items: center; gap: 10px;">
-                        <i data-lucide="file-text" style="color: var(--text-muted); width: 18px;"></i>
-                        <span style="font-weight: 600;">${o.po_number}</span>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="file-text" style="color: var(--text-muted); width: 18px;"></i>
+                            <span style="font-weight: 600;">${o.po_number}</span>
+                        </div>
                     </td>
-                    <td>${o.supplier_name || 'No Supplier'}</td>
-                    <td style="color: var(--text-muted);">${o.created_at}</td>
-                    <td style="font-weight: 600;">Rs ${o.total_cost.toLocaleString()}</td>
-                    <td><span class="badge ${isPending ? 'badge-blue' : 'badge-green'}"><i data-lucide="${isPending ? 'clock' : 'check'}" style="width:12px; margin-right:4px;"></i> ${o.status}</span></td>
-                    <td><button class="btn btn-outline" style="padding: 5px 12px; font-size: 0.8rem;" onclick="${isPending ? `receivePO(${o.id})` : ''}">${isPending ? 'Receive' : 'View'}</button></td>
+                    <td style="vertical-align: middle;">${o.supplier_name || 'No Supplier'}</td>
+                    <td style="vertical-align: middle; color: var(--text-muted);">${o.created_at}</td>
+                    <td style="vertical-align: middle; font-weight: 600;">Rs ${o.total_cost.toLocaleString()}</td>
+                    <td style="vertical-align: middle;"><span class="badge ${isPending ? 'badge-blue' : 'badge-green'}"><i data-lucide="${isPending ? 'clock' : 'check'}" style="width:12px; margin-right:4px;"></i> ${o.status}</span></td>
+                    <td>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-outline" style="padding: 5px 12px; font-size: 0.8rem;" onclick="viewPO(${o.id}, '${o.po_number}', '${o.status}')">View</button>
+                            ${isPending ? `<button class="btn btn-primary" style="padding: 5px 12px; font-size: 0.8rem;" onclick="receivePO(${o.id})">Receive</button>` : ''}
+                        </div>
+                    </td>
                 `;
                 list.appendChild(tr);
             });
@@ -211,35 +323,116 @@
             document.getElementById('po-modal').style.display = 'none';
         }
 
+        document.getElementById('po-scan').oninput = async (e) => {
+            const query = e.target.value;
+            const resultsDiv = document.getElementById('po-search-results');
+            
+            if (query.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            const products = await window.electron.invoke('search-products', query);
+            if (products.length === 0) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            resultsDiv.innerHTML = '';
+            resultsDiv.style.display = 'block';
+            
+            products.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'nav-item'; // repurpose nav-item styles for results
+                div.style.padding = '10px 15px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid var(--border)';
+                div.innerHTML = `
+                    <div style="font-weight: 600;">${p.name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${p.barcode} | Stock: ${p.quantity} ${p.unit}</div>
+                `;
+                div.onclick = () => {
+                    addToPO(p);
+                    resultsDiv.style.display = 'none';
+                    document.getElementById('po-scan').value = '';
+                };
+                resultsDiv.appendChild(div);
+            });
+        };
+
+        // Hide results on click outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#po-scan')) {
+                document.getElementById('po-search-results').style.display = 'none';
+            }
+        });
+
         document.getElementById('po-scan').onkeydown = async (e) => {
             if (e.key === 'Enter') {
                 const barcode = e.target.value;
-                e.target.value = '';
-                handleProductScan(barcode);
+                if (!barcode) return;
+                const p = await window.electron.invoke('get-product-by-barcode', barcode);
+                if (p && p.id) {
+                    addToPO(p);
+                    e.target.value = '';
+                    document.getElementById('po-search-results').style.display = 'none';
+                } else {
+                    // Not found, suggest quick add
+                    if (confirm("Product not found. Add it now?")) {
+                        showQuickAdd(barcode);
+                    }
+                }
             }
         };
 
-        async function handleProductScan(barcode) {
-            const cleanBarcode = barcode.trim();
-            if (!cleanBarcode) return;
-            const p = await window.electron.invoke('get-product-by-barcode', cleanBarcode);
-            if (p && p.id) {
-                const existing = poItems.find(item => item.id === p.id);
-                if (existing) {
-                    existing.quantity++;
-                } else {
-                    poItems.push({ ...p, quantity: 1, cost_price: p.cost_price });
-                }
-                renderPOItems();
+        function addToPO(p) {
+            const existing = poItems.find(item => item.id === p.id);
+            if (existing) {
+                existing.quantity++;
             } else {
-                alert('Product not found!');
+                poItems.push({ ...p, quantity: 1 });
             }
+            renderPOItems();
         }
+
+        function showQuickAdd(barcode = '') {
+            document.getElementById('quick-add-form').reset();
+            if (barcode) document.getElementById('qa-barcode').value = barcode;
+            document.getElementById('quick-add-modal').style.display = 'flex';
+            document.getElementById('qa-name').focus();
+        }
+
+        document.getElementById('quick-add-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const p = {
+                barcode: document.getElementById('qa-barcode').value,
+                name: document.getElementById('qa-name').value,
+                brand: document.getElementById('qa-brand').value,
+                category: document.getElementById('qa-category').value,
+                unit: document.getElementById('qa-unit').value,
+                cost_price: parseFloat(document.getElementById('qa-cost').value) || 0,
+                sale_price: parseFloat(document.getElementById('qa-sale').value) || 0,
+                quantity: parseInt(document.getElementById('qa-qty').value) || 0,
+                reorder_level: parseInt(document.getElementById('qa-reorder').value) || 5,
+                expiry_date: document.getElementById('qa-expiry').value
+            };
+            
+            const res = await window.electron.invoke('save-product', p);
+            if (res.success) {
+                // Get the saved product to add to PO
+                const saved = await window.electron.invoke('get-product-by-barcode', p.barcode);
+                addToPO(saved);
+                document.getElementById('quick-add-modal').style.display = 'none';
+                document.getElementById('po-scan').value = '';
+            } else {
+                alert('Error saving product: ' + res.error);
+            }
+        };
 
         function renderPOItems() {
             const list = document.getElementById('po-items-list');
             if (poItems.length === 0) {
-                list.innerHTML = '<tr><td colspan="5" class="text-center" style="padding: 40px; color: var(--text-muted);">Scan products to add to this purchase order</td></tr>';
+                list.innerHTML = '<tr><td colspan="6" class="text-center" style="padding: 40px; color: var(--text-muted);">Search or scan products to add</td></tr>';
                 document.getElementById('po-total').innerText = '0.00';
                 return;
             }
@@ -256,10 +449,17 @@
                     <td><input type="number" value="${item.quantity}" style="width: 60px;" onchange="updatePOQty(${index}, this.value)"></td>
                     <td><input type="number" value="${item.cost_price}" style="width: 100px;" onchange="updatePOCost(${index}, this.value)"></td>
                     <td>Rs ${sub.toLocaleString()}</td>
+                    <td><button class="btn btn-danger" style="padding: 4px;" onclick="removePOItem(${index})"><i data-lucide="trash-2" style="width:14px;"></i></button></td>
                 `;
                 list.appendChild(tr);
             });
             document.getElementById('po-total').innerText = total.toLocaleString();
+            lucide.createIcons();
+        }
+
+        function removePOItem(index) {
+            poItems.splice(index, 1);
+            renderPOItems();
         }
 
         function updatePOQty(index, val) { poItems[index].quantity = parseInt(val) || 1; renderPOItems(); }
@@ -279,6 +479,63 @@
             if (confirm("Confirm receiving this order? Stock will be updated.")) {
                 const res = await window.electron.invoke('receive-po', id);
                 if (res.success) loadPOs();
+            }
+        }
+
+        async function viewPO(id, number, status) {
+            const items = await window.electron.invoke('get-po-items', id);
+            const list = document.getElementById('view-po-items');
+            
+            // Add Return header if needed
+            const table = list.closest('table');
+            const thead = table.querySelector('thead tr');
+            if (thead.cells.length === 5) {
+                const th = document.createElement('th');
+                th.innerText = 'Action';
+                thead.appendChild(th);
+            }
+
+            list.innerHTML = '';
+            let total = 0;
+            items.forEach(item => {
+                total += item.subtotal;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.product_name}</td>
+                    <td>${item.barcode}</td>
+                    <td>${item.quantity}</td>
+                    <td>Rs ${item.unit_cost.toLocaleString()}</td>
+                    <td style="font-weight:600;">Rs ${item.subtotal.toLocaleString()}</td>
+                    <td>
+                        ${status === 'received' ? 
+                            `<button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="returnPOItem(${id}, ${item.id}, ${item.product_id}, ${item.quantity}, ${item.unit_cost}, '${item.product_name}')">Return</button>` 
+                            : '<span style="color:var(--text-muted); font-size:0.75rem;">-</span>'}
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            
+            document.getElementById('view-po-title').innerText = 'PO: ' + (number || id);
+            document.getElementById('view-po-subtitle').innerText = 'Status: ' + (status || 'Unknown').toUpperCase();
+            document.getElementById('view-po-total').innerText = `Total: Rs ${total.toLocaleString()}`;
+            document.getElementById('view-modal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        async function returnPOItem(poId, itemId, productId, quantity, unitCost, name) {
+            if (!confirm(`Return ${quantity}x ${name} to supplier? This will subtract items from your inventory.`)) return;
+
+            const res = await window.electron.invoke('return-po-item', { poId, itemId, productId, quantity, unitCost });
+            if (res.success) {
+                alert('Stock updated and item returned successfully.');
+                // Refresh modal
+                const poTitle = document.getElementById('view-po-title').innerText;
+                const poNo = poTitle.split(': ')[1];
+                const poStatus = document.getElementById('view-po-subtitle').innerText.split(': ')[1].toLowerCase();
+                viewPO(poId, poNo, poStatus);
+                loadPOs();
+            } else {
+                alert('Return failed: ' + res.error);
             }
         }
 

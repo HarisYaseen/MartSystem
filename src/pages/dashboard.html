@@ -34,7 +34,7 @@
         <div class="content">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="icon-wrapper"><i data-lucide="dollar-sign"></i></div>
+                    <div class="icon-wrapper" style="background: #f0fdf4; color: #10b981;"><i data-lucide="banknote"></i></div>
                     <div class="label">Today's Revenue</div>
                     <div class="value" id="stat-revenue">Rs. 0</div>
                     <div class="sub-value" id="stat-sales-count">0 sales today</div>
@@ -52,20 +52,29 @@
                     <div class="sub-value">Products below reorder level</div>
                 </div>
                 <div class="stat-card">
-                    <div class="icon-wrapper" style="background: #fdf2f7; color: #db2777;"><i data-lucide="box"></i></div>
-                    <div class="label">Pending Orders</div>
-                    <div class="value">0</div>
-                    <div class="sub-value">Purchase orders awaiting delivery</div>
+                    <div class="icon-wrapper" style="background: #fff1f2; color: #e11d48;"><i data-lucide="calendar-x"></i></div>
+                    <div class="label">Expired Items</div>
+                    <div class="value" id="stat-expired" style="color: #e11d48;">0</div>
+                    <div class="sub-value">Products past expiry date</div>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
                 <div class="card">
-                    <h3>Sales Analytics (30 Days)</h3>
+                    <h3>Sales Trend (30 Days)</h3>
                     <div style="height: 300px; position: relative;">
                         <canvas id="salesChart"></canvas>
                     </div>
                 </div>
+                <div class="card">
+                    <h3>Category Breakdown</h3>
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
                 <div class="card">
                     <h3>Top Products</h3>
                     <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 15px;">Highest revenue items this month.</p>
@@ -73,26 +82,22 @@
                         <!-- Loaded via JS -->
                     </div>
                 </div>
-            </div>
-
-            <div class="card">
-                <h3>Low Stock Alerts</h3>
-                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 15px;">Items that need to be reordered soon.</p>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Barcode</th>
-                                <th>Current Stock</th>
-                                <th>Reorder Level</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="low-stock-table">
-                            <!-- Loaded via JS -->
-                        </tbody>
-                    </table>
+                <div class="card">
+                    <h3>Low Stock Alerts</h3>
+                    <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 15px;">Items that need to be reordered soon.</p>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Barcode</th>
+                                    <th>Stock</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="low-stock-table"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -106,6 +111,11 @@
             document.getElementById('stat-revenue').innerText = 'Rs. ' + stats.todayRevenue.toLocaleString();
             document.getElementById('stat-sales-count').innerText = stats.todaySales + ' sales today';
             document.getElementById('stat-low-stock').innerText = stats.lowStock;
+
+            // Load Expired Count
+            const allProducts = await window.electron.invoke('get-products');
+            const expiredCount = allProducts.filter(p => p.expiry_date && new Date(p.expiry_date) < new Date()).length;
+            document.getElementById('stat-expired').innerText = expiredCount;
             
             // Basic profit calculation (assuming 20% margin for demo if not in DB yet)
             document.getElementById('stat-profit').innerText = 'Rs. ' + (stats.todayRevenue * 0.2).toLocaleString();
@@ -148,9 +158,31 @@
                 topList.appendChild(div);
             });
 
-            // Analytics Chart
+            // Analytics Charts
             const analytics = await window.electron.invoke('get-sales-analytics');
             renderChart(analytics);
+
+            const categorySales = await window.electron.invoke('get-category-sales');
+            renderCategoryChart(categorySales);
+        }
+
+        function renderCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.category),
+                    datasets: [{
+                        data: data.map(d => d.revenue),
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+                }
+            });
         }
 
         function renderChart(data) {

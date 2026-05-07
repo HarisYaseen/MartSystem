@@ -40,6 +40,19 @@
         </div>
 
         <div class="content">
+            <!-- Stats Row -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                <div class="card" style="display: flex; align-items: center; gap: 20px; padding: 24px; border-left: 4px solid var(--primary-color);">
+                    <div style="background: var(--primary-light); padding: 12px; border-radius: 12px; color: var(--primary-color);">
+                        <i data-lucide="banknote" style="width: 24px; height: 24px;"></i>
+                    </div>
+                    <div>
+                        <div style="color: var(--text-muted); font-size: 0.875rem; font-weight: 500;">Total Inventory Value (Cost)</div>
+                        <div id="total-inventory-value" style="font-size: 1.5rem; font-weight: 700; color: var(--text-dark); margin-top: 4px;">Rs 0</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card" style="padding: 12px 24px;">
                 <div style="position: relative; margin: 15px 0 25px 0;">
                     <i data-lucide="search" style="position: absolute; left: 12px; top: 11px; width: 18px; height: 18px; color: var(--text-muted);"></i>
@@ -149,10 +162,14 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
                     <div class="form-group">
                         <label>Unit</label>
                         <input type="text" id="p-unit" value="pcs">
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="p-expiry">
                     </div>
                     <div class="form-group">
                         <label>Supplier</label>
@@ -184,7 +201,10 @@
             const list = document.getElementById('product-list');
             list.innerHTML = '';
             
+            let totalValue = 0;
+
             products.forEach(p => {
+                totalValue += (p.cost_price || 0) * (p.quantity || 0);
                 const tr = document.createElement('tr');
                 tr.id = `prod-${p.barcode}`;
                 const isLow = p.quantity <= p.reorder_level;
@@ -210,6 +230,11 @@
                 `;
                 list.appendChild(tr);
             });
+            
+            const totalDisplay = document.getElementById('total-inventory-value');
+            if (totalDisplay) {
+                totalDisplay.innerText = 'Rs ' + totalValue.toLocaleString();
+            }
             lucide.createIcons();
         }
 
@@ -326,6 +351,7 @@
             document.getElementById('p-price').value = p.sale_price;
             document.getElementById('p-qty').value = p.quantity;
             document.getElementById('p-unit').value = p.unit;
+            document.getElementById('p-expiry').value = p.expiry_date || '';
             document.getElementById('modal-title').innerText = 'Edit Product';
             document.getElementById('product-modal').style.display = 'flex';
             document.getElementById('lookup-status').style.display = 'none';
@@ -454,6 +480,7 @@
                 sale_price: parseFloat(document.getElementById('p-price').value) || 0,
                 quantity: parseInt(document.getElementById('p-qty').value) || 0,
                 unit: document.getElementById('p-unit').value || 'pcs',
+                expiry_date: document.getElementById('p-expiry').value || null,
                 reorder_level: parseInt(document.getElementById('p-reorder').value) || 5,
                 supplier_id: document.getElementById('p-supplier').value || null
             };
