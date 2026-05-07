@@ -1,8 +1,7 @@
-const { ipcMain } = require('electron');
 const { queryOne, queryAll } = require('../db');
 
-function registerReportHandlers() {
-    ipcMain.handle('get-inventory-report', () => {
+function registerReportHandlers(handle) {
+    handle('get-inventory-report', () => {
         return queryAll(`SELECT p.*, s.name as supplier_name 
                         FROM products p 
                         LEFT JOIN suppliers s ON p.supplier_id = s.id 

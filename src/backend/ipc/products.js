@@ -16,15 +16,21 @@ function registerProductHandlers() {
         };
     });
 
-    ipcMain.handle('get-products', () => queryAll('SELECT p.*, s.name as supplier_name FROM products p LEFT JOIN suppliers s ON p.supplier_id = s.id ORDER BY p.name'));
+    handle('get-products', () => queryAll('SELECT p.*, s.name as supplier_name FROM products p LEFT JOIN suppliers s ON p.supplier_id = s.id ORDER BY p.name'));
     
-    ipcMain.handle('get-product-by-barcode', (e, barcode) => queryOne('SELECT * FROM products WHERE barcode = ?', [barcode]));
+    handle('get-product-by-barcode', (e, barcode) => queryOne('SELECT * FROM products WHERE barcode = ?', [barcode]));
     
-    ipcMain.handle('search-products', (e, query) => {
+    handle('search-products', (e, query) => {
         return queryAll('SELECT * FROM products WHERE barcode = ? OR name LIKE ?', [query, `%${query}%`]);
     });
 
     ipcMain.handle('save-product', (e, p) => {
+        // Strict Input Validation
+        if (!p.barcode || p.barcode.trim() === '') return { success: false, error: 'Barcode is required.' };
+        if (!p.name || p.name.trim() === '') return { success: false, error: 'Product name is required.' };
+        if (p.cost_price < 0 || p.sale_price < 0) return { success: false, error: 'Prices cannot be negative.' };
+        if (p.quantity < 0) return { success: false, error: 'Quantity cannot be negative.' };
+
         if (p.id) {
             return run('UPDATE products SET name=?, barcode=?, brand=?, category=?, unit=?, cost_price=?, sale_price=?, quantity=?, reorder_level=?, supplier_id=?, updated_at=datetime("now", "localtime") WHERE id=?', 
                 [p.name, p.barcode, p.brand || '', p.category, p.unit, p.cost_price, p.sale_price, p.quantity, p.reorder_level, p.supplier_id || null, p.id]);
@@ -32,6 +38,22 @@ function registerProductHandlers() {
             return run('INSERT INTO products (name, barcode, brand, category, unit, cost_price, sale_price, quantity, reorder_level, supplier_id) VALUES (?,?,?,?,?,?,?,?,?,?)', 
                 [p.name, p.barcode, p.brand || '', p.category, p.unit, p.cost_price, p.sale_price, p.quantity, p.reorder_level, p.supplier_id || null]);
         }
+    });
+
+    ipcMain.handle('delete-product', async (e, id) => {
+        // 1. Check if product has sales history
+        const sales = queryOne('SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?', [id]);
+        if (sales && sales.count > 0) {
+            return { success: false, error: 'Cannot delete product with sales history. Try setting stock to 0 instead.' };
+        }
+
+        // 2. Check if product has PO history
+        const pos = queryOne('SELECT COUNT(*) as count FROM purchase_order_items WHERE product_id = ?', [id]);
+        if (pos && pos.count > 0) {
+            return { success: false, error: 'Cannot delete product linked to purchase orders.' };
+        }
+
+        return run('DELETE FROM products WHERE id = ?', [id]);
     });
 
     ipcMain.handle('adjust-stock', (e, { productId, delta, reason }) => {

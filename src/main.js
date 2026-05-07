@@ -27,6 +27,18 @@ if (app.isPackaged) {
 
 let mainWindow;
 
+// Security Wrapper for IPC
+function secureHandle(channel, handler) {
+    ipcMain.handle(channel, async (event, ...args) => {
+        const sender = BrowserWindow.fromWebContents(event.sender);
+        if (!sender || sender !== mainWindow) {
+            logInfo(`SECURITY ALERT: Unauthorized IPC call on channel: ${channel}`);
+            return { success: false, error: 'Unauthorized sender' };
+        }
+        return handler(event, ...args);
+    });
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280, height: 800,
@@ -50,13 +62,13 @@ function createWindow() {
 app.whenReady().then(async () => {
     await connectDB();
     
-    // Register All IPC Handlers
-    registerProductHandlers();
-    registerSalesHandlers();
-    registerSupplierHandlers();
-    registerReportHandlers();
-    registerSystemHandlers();
-    registerPrinterHandlers();
+    // Register All IPC Handlers (passing secureHandle)
+    registerProductHandlers(secureHandle);
+    registerSalesHandlers(secureHandle);
+    registerSupplierHandlers(secureHandle);
+    registerReportHandlers(secureHandle);
+    registerSystemHandlers(secureHandle);
+    registerPrinterHandlers(secureHandle);
 
     createWindow();
 

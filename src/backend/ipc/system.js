@@ -1,16 +1,17 @@
-const { ipcMain, app, BrowserWindow } = require('electron');
-const { autoUpdater } = require('electron-updater');
-const { queryAll, run, logInfo } = require('../db');
+const { app, dialog, BrowserWindow } = require('electron');
+const { queryAll, run, saveDB, logInfo } = require('../db');
+const fs = require('fs');
+const path = require('path');
 
-function registerSystemHandlers() {
-    ipcMain.handle('get-settings', () => {
+function registerSystemHandlers(handle) {
+    handle('get-settings', () => {
         const rows = queryAll('SELECT * FROM settings');
         const settings = {};
         rows.forEach(r => settings[r.key] = r.value);
         return settings;
     });
 
-    ipcMain.handle('save-settings', (e, settings) => {
+    handle('save-settings', (e, settings) => {
         try {
             for (const [key, value] of Object.entries(settings)) {
                 run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
@@ -21,21 +22,48 @@ function registerSystemHandlers() {
         }
     });
 
-    ipcMain.handle('get-version', () => app.getVersion());
+    handle('select-backup-dir', async (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        const result = await dialog.showOpenDialog(win, {
+            properties: ['openDirectory'],
+            title: 'Select Backup Location'
+        });
+        if (result.canceled) return null;
+        return result.filePaths[0];
+    });
 
-    ipcMain.handle('check-for-updates', async () => {
-        logInfo('Manual update check triggered.');
+    handle('create-backup', async (e, customPath) => {
+        try {
+            saveDB();
+            const dbPath = path.join(app.getPath('userData'), 'mart_database.sqlite');
+            if (!fs.existsSync(customPath)) fs.mkdirSync(customPath, { recursive: true });
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const backupPath = path.join(customPath, `mart_backup_${timestamp}.sqlite`);
+
+            fs.copyFileSync(dbPath, backupPath);
+            logInfo(`Backup created successfully at ${backupPath}`);
+            return { success: true, path: backupPath };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+
+    handle('get-version', () => app.getVersion());
+
+    handle('check-for-updates', async () => {
+        const { autoUpdater } = require('electron-updater');
         const result = await autoUpdater.checkForUpdatesAndNotify();
         return { success: true, updateInfo: result ? result.updateInfo : null };
     });
 
-    ipcMain.handle('quit-and-install', () => {
+    handle('quit-and-install', () => {
+        const { autoUpdater } = require('electron-updater');
         autoUpdater.quitAndInstall();
         return { success: true };
     });
 }
 
-function registerPrinterHandlers() {
     ipcMain.handle('get-thermal-printer', async () => {
         const win = BrowserWindow.getFocusedWindow();
         if (!win) return null;

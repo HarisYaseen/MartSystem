@@ -1,8 +1,7 @@
-const { ipcMain } = require('electron');
 const { queryOne, queryAll, run, saveDB, getDB, logInfo } = require('../db');
 
-function registerSalesHandlers() {
-    ipcMain.handle('process-sale', (e, { items, total, discount, tax, net, method, paid }) => {
+function registerSalesHandlers(handle) {
+    handle('process-sale', (e, { items, total, discount, tax, net, method, paid }) => {
         const db = getDB();
         try {
             db.run('BEGIN TRANSACTION');
@@ -58,32 +57,52 @@ function registerSalesHandlers() {
     ipcMain.handle('get-sale-items', (e, saleId) => queryAll('SELECT * FROM sale_items WHERE sale_id = ?', [saleId]));
 
     ipcMain.handle('return-sale-item', async (e, { saleId, itemId, productId, quantity, unitPrice }) => {
+        const db = getDB();
         try {
-            run('UPDATE products SET quantity = quantity + ? WHERE id = ?', [quantity, productId]);
-            run('DELETE FROM sale_items WHERE id = ?', [itemId]);
+            db.run('BEGIN TRANSACTION');
+
+            // 1. Update product stock
+            db.run('UPDATE products SET quantity = quantity + ? WHERE id = ?', [quantity, productId]);
+
+            // 2. Remove sale item
+            db.run('DELETE FROM sale_items WHERE id = ?', [itemId]);
             
+            // 3. Update sale total
             const refundAmount = quantity * unitPrice;
-            run('UPDATE sales SET total_amount = total_amount - ?, net_amount = net_amount - ? WHERE id = ?', [refundAmount, refundAmount, saleId]);
+            db.run('UPDATE sales SET total_amount = total_amount - ?, net_amount = net_amount - ? WHERE id = ?', [refundAmount, refundAmount, saleId]);
             
+            // 4. If no items left, delete the sale record
             const remaining = queryOne('SELECT COUNT(*) as count FROM sale_items WHERE sale_id = ?', [saleId]);
-            if (remaining.count === 0) run('DELETE FROM sales WHERE id = ?', [saleId]);
-            
+            if (remaining.count === 0) {
+                db.run('DELETE FROM sales WHERE id = ?', [saleId]);
+            }
+
+            db.run('COMMIT');
+            saveDB();
             return { success: true };
         } catch (err) {
+            db.run('ROLLBACK');
             return { success: false, error: err.message };
         }
     });
 
     ipcMain.handle('refund-sale', async (e, saleId) => {
+        const db = getDB();
         try {
+            db.run('BEGIN TRANSACTION');
+
             const items = queryAll('SELECT product_id, quantity FROM sale_items WHERE sale_id = ?', [saleId]);
             for (const item of items) {
-                run('UPDATE products SET quantity = quantity + ? WHERE id = ?', [item.quantity, item.product_id]);
+                db.run('UPDATE products SET quantity = quantity + ? WHERE id = ?', [item.quantity, item.product_id]);
             }
-            run('DELETE FROM sale_items WHERE sale_id = ?', [saleId]);
-            run('DELETE FROM sales WHERE id = ?', [saleId]);
+            db.run('DELETE FROM sale_items WHERE sale_id = ?', [saleId]);
+            db.run('DELETE FROM sales WHERE id = ?', [saleId]);
+
+            db.run('COMMIT');
+            saveDB();
             return { success: true };
         } catch (err) {
+            db.run('ROLLBACK');
             return { success: false, error: err.message };
         }
     });

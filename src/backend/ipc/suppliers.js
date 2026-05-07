@@ -1,10 +1,11 @@
-const { ipcMain } = require('electron');
-const { queryOne, queryAll, run, logInfo } = require('../db');
+const { queryOne, queryAll, run, saveDB } = require('../db');
 
-function registerSupplierHandlers() {
-    ipcMain.handle('get-suppliers', () => queryAll('SELECT * FROM suppliers ORDER BY name'));
+function registerSupplierHandlers(handle) {
+    handle('get-suppliers', () => queryAll('SELECT * FROM suppliers ORDER BY name'));
     
-    ipcMain.handle('save-supplier', (e, s) => {
+    handle('save-supplier', (e, s) => {
+        if (!s.name || s.name.trim() === '') return { success: false, error: 'Supplier name is required.' };
+        
         if (s.id) {
             return run('UPDATE suppliers SET name=?, contact_name=?, phone=?, email=?, address=? WHERE id=?', 
                 [s.name, s.contact_name, s.phone, s.email, s.address, s.id]);
@@ -12,6 +13,22 @@ function registerSupplierHandlers() {
             return run('INSERT INTO suppliers (name, contact_name, phone, email, address) VALUES (?,?,?,?,?)', 
                 [s.name, s.contact_name, s.phone, s.email, s.address]);
         }
+    });
+
+    ipcMain.handle('delete-supplier', async (e, id) => {
+        // 1. Check for PO history
+        const pos = queryOne('SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ?', [id]);
+        if (pos && pos.count > 0) {
+            return { success: false, error: 'Cannot delete supplier with purchase order history.' };
+        }
+
+        // 2. Check for Ledger/Balance
+        const supplier = queryOne('SELECT current_balance FROM suppliers WHERE id = ?', [id]);
+        if (supplier && Math.abs(supplier.current_balance) > 0.01) {
+            return { success: false, error: 'Cannot delete supplier with an outstanding balance.' };
+        }
+
+        return run('DELETE FROM suppliers WHERE id = ?', [id]);
     });
 
     ipcMain.handle('get-supplier-ledger', (e, supplierId) => {
