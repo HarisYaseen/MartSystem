@@ -160,13 +160,13 @@
 
     <!-- Quick Add Product Modal -->
     <div id="quick-add-modal" class="modal">
-        <div class="modal-content" style="width: 500px; max-width: 95vw; overflow-x: hidden;">
+        <div class="modal-content" style="width: 500px; max-width: 95vw; overflow: hidden; padding: 24px;">
             <div class="modal-header" style="margin-bottom: 20px;">
                 <h2 style="margin: 0;">Quick Add Product</h2>
                 <button class="btn btn-outline" style="padding: 5px; border: none;" onclick="document.getElementById('quick-add-modal').style.display='none'"><i data-lucide="x"></i></button>
             </div>
-            <form id="quick-add-form" style="display: flex; flex-direction: column; gap: 16px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <form id="quick-add-form" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="form-group" style="margin: 0;">
                         <label style="display: block; margin-bottom: 6px; font-weight: 500;">Barcode</label>
                         <input type="text" id="qa-barcode" required style="width: 100%; box-sizing: border-box;">
@@ -183,7 +183,16 @@
                     </div>
                     <div class="form-group" style="margin: 0;">
                         <label style="display: block; margin-bottom: 6px; font-weight: 500;">Category</label>
-                        <input type="text" id="qa-category" value="General" style="width: 100%; box-sizing: border-box;">
+                        <select id="qa-category" style="width: 100%; box-sizing: border-box;">
+                            <option value="General">General</option>
+                            <option value="Pakistani">Pakistani Products</option>
+                            <option value="Beverages">Beverages</option>
+                            <option value="Snacks">Snacks</option>
+                            <option value="Grocery">Grocery</option>
+                            <option value="Personal Care">Personal Care</option>
+                            <option value="Household">Household</option>
+                            <option value="Dairy">Dairy</option>
+                        </select>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
